@@ -65,6 +65,7 @@ def diag():
         "has_key": bool(k),
         "key_fingerprint": (k[:4] + "..." + k[-4:]) if k else None,
         "secret_length": len(sec),  # a valid AWS secret is exactly 40 chars
+        "secret_tail": ("..." + sec[-4:]) if sec else None,  # compare with local (...2/Aw)
         "aws_region_env": os.environ.get("AWS_DEFAULT_REGION") or os.environ.get("AWS_REGION"),
         "model_id": os.environ.get("BEDROCK_MODEL_ID", "(default)"),
     }
