@@ -7,9 +7,9 @@ it"*) and mira returns a ranked, explained siting recommendation across 46 Europ
 scored on cost, clean-energy share, grid headroom, and connectivity — with a power-supply
 plan and an optional satellite cross-check.
 
-The language model is used only to interpret the request and narrate the answer. Every number
-is produced by a deterministic scoring engine (TOPSIS), so results are transparent,
-reproducible, and auditable.
+The language model — Anthropic Claude, served through **Amazon Bedrock** — is used only to
+interpret the request and narrate the answer. Every number is produced by a deterministic
+scoring engine (TOPSIS), so results are transparent, reproducible, and auditable.
 
 ---
 
@@ -40,13 +40,42 @@ The slider-driven `/optimize_site` path works fully offline.
 
 ## Configuration
 
-mira runs with no configuration. Two optional capabilities can be enabled:
+mira runs with no configuration. Two optional capabilities can be enabled.
 
-**Conversational agent (`/ask_agent`)** — uses AWS Bedrock (Claude). Provide standard AWS
-credentials in the environment. Model and region are set in `agent.py`. Without Bedrock, a
-keyword-based fallback extracts priorities; the ranking is identical.
+### Conversational agent — AWS Bedrock (`/ask_agent`)
 
-**Satellite verification** — uses Google Earth Engine + AlphaEarth.
+The natural-language endpoint runs on **Amazon Bedrock**. `agent.py` creates a
+`bedrock-runtime` client (via `boto3`) and calls the **Converse API** with tool-use: the
+model (Anthropic Claude) extracts the four priority weights and an optional facility size
+from the brief, the deterministic engine runs, and the model narrates the result.
+
+| Setting | Value | Override |
+|---------|-------|----------|
+| Service | Amazon Bedrock Runtime (Converse API, tool-use) | — |
+| Model | `eu.anthropic.claude-sonnet-4-6` (an EU inference profile) | `BEDROCK_MODEL_ID` env var |
+| Region | `eu-central-1` | set in `agent.py` |
+
+**Requirements:**
+
+1. An AWS account with **Bedrock model access** granted for the Claude model in
+   `eu-central-1` (request it once in the Bedrock console → *Model access*).
+2. AWS credentials available through the standard boto3 chain — environment variables,
+   a shared profile, or an IAM role:
+
+   ```bash
+   export AWS_ACCESS_KEY_ID=...
+   export AWS_SECRET_ACCESS_KEY=...
+   # optional: export BEDROCK_MODEL_ID=eu.anthropic.claude-sonnet-4-6
+   ```
+
+> The region is pinned to `eu-central-1` because the `eu.` inference profile is only valid
+> there. Do not rely on `AWS_REGION` to change it.
+
+If Bedrock is unreachable, `agent.py` falls back to a keyword-based weight extractor
+(`run_local`). The deterministic ranking is identical either way; only the natural-language
+narration differs. The `/optimize_site` endpoint never uses Bedrock.
+
+### Satellite verification — Google Earth Engine
 
 ```bash
 pip install earthengine-api
@@ -54,7 +83,7 @@ earthengine authenticate
 export EE_PROJECT=your-earth-engine-project-id
 ```
 
-Without it, the satellite badge is simply hidden.
+Without it, the satellite badge is simply hidden and the ranking is unaffected.
 
 ---
 
