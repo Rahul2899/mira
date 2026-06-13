@@ -2,6 +2,12 @@
 
 **An AI agent that recommends where to build a data center in Europe — and how to power it.**
 
+### ▶ [**Live demo — mira-f3ml.onrender.com**](https://mira-f3ml.onrender.com/)
+
+> The hosted app may take ~30 seconds to wake from idle on the first request.
+
+---
+
 Describe a data center in plain language (*"80 MW, lowest cost, but the grid must handle
 it"*) and mira returns a ranked, explained siting recommendation across 46 European regions,
 scored on cost, clean-energy share, grid headroom, and connectivity — with a power-supply

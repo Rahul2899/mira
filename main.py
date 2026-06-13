@@ -55,29 +55,4 @@ def ask_agent(req: AgentRequest):
         return {**run_local(req.prompt), "source": "offline"}
 
 
-@app.get("/_diag")
-def diag():
-    """Temporary: surfaces why Bedrock falls back (no secrets exposed)."""
-    import os
-    k = os.environ.get("AWS_ACCESS_KEY_ID", "")
-    sec = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
-    info = {
-        "has_key": bool(k),
-        "key_fingerprint": (k[:4] + "..." + k[-4:]) if k else None,
-        "secret_length": len(sec),  # a valid AWS secret is exactly 40 chars
-        "secret_tail": ("..." + sec[-4:]) if sec else None,
-        "secret_has_whitespace": sec != sec.strip(),
-        "secret_has_special": any(c in sec for c in "+/="),
-        "key_has_whitespace": k != k.strip(),
-        "aws_region_env": os.environ.get("AWS_DEFAULT_REGION") or os.environ.get("AWS_REGION"),
-        "model_id": os.environ.get("BEDROCK_MODEL_ID", "(default)"),
-    }
-    try:
-        run_agent("test")
-        info["bedrock"] = "OK — live call succeeded"
-    except Exception as e:
-        info["bedrock_error"] = f"{type(e).__name__}: {str(e)[:300]}"
-    return info
-
-
 app.mount("/", StaticFiles(directory=Path(__file__).parent / "static", html=True))
