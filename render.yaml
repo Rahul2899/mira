@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: mira
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: frankfurt          # closest to the eu-central-1 Bedrock model
+    healthCheckPath: /
+    envVars:
+      - key: BEDROCK_MODEL_ID
+        value: eu.anthropic.claude-sonnet-4-6
+      # Set these in the Render dashboard (do NOT commit secrets):
+      #   AWS_ACCESS_KEY_ID
+      #   AWS_SECRET_ACCESS_KEY
+      #   AWS_DEFAULT_REGION = eu-central-1
