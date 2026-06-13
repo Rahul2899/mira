@@ -59,9 +59,12 @@ def ask_agent(req: AgentRequest):
 def diag():
     """Temporary: surfaces why Bedrock falls back (no secrets exposed)."""
     import os
+    k = os.environ.get("AWS_ACCESS_KEY_ID", "")
+    sec = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
     info = {
-        "has_key": bool(os.environ.get("AWS_ACCESS_KEY_ID")),
-        "has_secret": bool(os.environ.get("AWS_SECRET_ACCESS_KEY")),
+        "has_key": bool(k),
+        "key_fingerprint": (k[:4] + "..." + k[-4:]) if k else None,
+        "secret_length": len(sec),  # a valid AWS secret is exactly 40 chars
         "aws_region_env": os.environ.get("AWS_DEFAULT_REGION") or os.environ.get("AWS_REGION"),
         "model_id": os.environ.get("BEDROCK_MODEL_ID", "(default)"),
     }
