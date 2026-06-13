@@ -3,8 +3,21 @@ import re
 import boto3
 from topsis import run_topsis_optimization
 
-MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-6")
-bedrock = boto3.client("bedrock-runtime", region_name="eu-central-1")
+MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-6").strip()
+
+# Strip stray whitespace/newlines that often sneak into credentials pasted into
+# hosting dashboards — a trailing newline makes Bedrock reject the signature.
+_key = os.environ.get("AWS_ACCESS_KEY_ID", "").strip()
+_secret = os.environ.get("AWS_SECRET_ACCESS_KEY", "").strip()
+_region = (os.environ.get("AWS_DEFAULT_REGION") or os.environ.get("AWS_REGION") or "eu-central-1").strip()
+
+if _key and _secret:
+    bedrock = boto3.client(
+        "bedrock-runtime", region_name="eu-central-1",
+        aws_access_key_id=_key, aws_secret_access_key=_secret,
+    )
+else:
+    bedrock = boto3.client("bedrock-runtime", region_name="eu-central-1")
 
 SYSTEM_PROMPT = """You are the Autonomous Siting Agent (ASA), a senior infrastructure siting analyst for data center developers. A user describes a data center they want to build, in natural language, with varying priorities around cost, sustainability, grid connection speed, and connectivity.
 
