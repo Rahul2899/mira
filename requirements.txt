@@ -1,0 +1,11 @@
+fastapi==0.115.0
+uvicorn==0.30.6
+pandas==2.2.2
+numpy==1.26.4
+boto3==1.35.36
+
+# Optional — satellite verification layer (Google Earth Engine / AlphaEarth)
+# earthengine-api==1.7.30
+
+# Optional — regenerate the presentation deck
+# python-pptx==1.0.2

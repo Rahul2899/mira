@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASA — Autonomous Siting Agent</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='none' stroke='%23a8842c' stroke-width='2'/><circle cx='16' cy='16' r='3' fill='%23a8842c'/></svg>">
+<script src="vendor/globe.gl.min.js"></script>
+<script src="vendor/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4f0e6; --ink: #211d12; --muted: #8d8470; --gold: #a8842c; --gold-bright: #c9a84c;
+    --line: rgba(168,132,44,.25); --card: rgba(255,255,255,.82);
+    --land: #ded3b4; --land-edge: #b8a878; --sea: #eef0ea;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body { background: var(--bg); color: var(--ink); font-family: 'Manrope', sans-serif; }
+
+  /* ---------- LEFT: GLOBE ---------- */
+  #stage { position: fixed; inset: 0; overflow: hidden;
+    background: radial-gradient(ellipse 60% 70% at 50% 45%, #fbf8f0 0%, var(--bg) 72%); }
+  #brand { position: absolute; top: 30px; left: 38px; z-index: 5; }
+  #brand h1 { font-family: 'Fraunces', serif; font-style: italic; font-weight: 400; font-size: 30px; color: var(--ink); }
+  #brand p { font-size: 9.5px; letter-spacing: 4px; color: var(--gold); margin-top: 5px; font-family: 'JetBrains Mono', monospace; }
+
+  #globe { position: absolute; inset: 0; opacity: 0; transition: opacity 1.6s ease; }
+  #globe.on { opacity: 1; }
+
+  #zoomctl { position: fixed; top: 30px; right: 34px; z-index: 9; display: flex; flex-direction: column; gap: 8px;
+    transition: right .7s cubic-bezier(.22,1,.3,1); }
+  body.has-result #zoomctl { right: 534px; }
+  #zoomctl button { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line);
+    background: rgba(255,255,255,.85); color: var(--gold); font-size: 18px; cursor: pointer; backdrop-filter: blur(8px);
+    box-shadow: 0 4px 14px rgba(90,70,20,.1); display: flex; align-items: center; justify-content: center; transition: all .2s; }
+  #zoomctl button:hover { background: #fff; color: var(--ink); transform: scale(1.06); }
+
+  #legend { position: absolute; left: 38px; bottom: 290px; z-index: 5; display: flex; flex-direction: column; gap: 7px;
+    font-size: 10.5px; color: #d9d2c2; background: rgba(20,30,46,.6); border: 1px solid rgba(255,255,255,.12); border-radius: 10px;
+    padding: 11px 14px; backdrop-filter: blur(8px); opacity: 0; transition: opacity .5s; }
+  #legend.on { opacity: 1; }
+  #legend span { display: flex; align-items: center; gap: 8px; }
+  #legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .lg-win { background: var(--gold-bright); box-shadow: 0 0 7px 1px rgba(201,168,76,.8); }
+  .lg-site { background: var(--gold); }
+  .lg-hub { background: #5b8fd6; box-shadow: 0 0 6px 1px rgba(91,143,214,.7); }
+  .heatbar { display: inline-block; width: 130px; height: 8px; border-radius: 4px;
+    background: linear-gradient(90deg, rgb(220,60,60), rgb(220,210,60), rgb(60,210,60)); }
+  .fxgrid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px 10px; }
+  .fxgrid > div { display: flex; flex-direction: column; }
+  .fxn { font-family: 'Fraunces', serif; font-size: 19px; color: var(--gold); }
+  .fxl { font-size: 9.5px; color: var(--muted); font-family: 'JetBrains Mono', monospace; letter-spacing: .5px; }
+
+  /* globe HTML markers — gold region pills, screen-space de-collided each frame */
+  .gm { position: relative; transform: translate(-50%, -50%); transition: opacity .25s; }
+  .gm .dot { position: absolute; left: 0; top: 0; transform: translate(-50%,-50%);
+    width: 10px; height: 10px; border-radius: 50%; background: var(--gold); border: 2px solid #fffbef;
+    box-shadow: 0 1px 4px rgba(90,70,20,.45); cursor: pointer; z-index: 2; }
+  .gm .lab { position: absolute; left: 0; top: 0; white-space: nowrap; font: 600 12px 'Manrope', sans-serif;
+    color: var(--ink); background: rgba(255,253,246,.97); padding: 3px 11px 3px 22px; border-radius: 999px;
+    border: 1px solid var(--line); box-shadow: 0 4px 12px rgba(90,70,20,.16); cursor: pointer; }
+  .gm .lab .rk { position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
+    font: 700 10px 'Fraunces', serif; font-style: italic; color: var(--gold); }
+  .gm.flip .lab { padding: 3px 22px 3px 11px; }
+  .gm.flip .lab .rk { left: auto; right: 9px; }
+  .gm.win .dot { width: 14px; height: 14px; background: var(--gold-bright);
+    box-shadow: 0 0 0 4px rgba(201,168,76,.25), 0 0 14px 3px rgba(201,168,76,.55); animation: gpulse 2.2s ease-in-out infinite; }
+  .gm.win .lab { font-weight: 700; color: #fffbef; background: linear-gradient(135deg, var(--gold-bright), var(--gold)); border-color: transparent; }
+  .gm.win .lab .rk { color: #fffbef; }
+  .gm.hub { transform: translate(-50%, -50%); }
+  .gm.hub { transform: translate(-50%, -50%); }
+  .gm.hub .hubdot { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 8px; height: 8px;
+    border-radius: 50%; background: #5b7fa6; box-shadow: 0 0 5px 1px rgba(91,127,166,.5), 0 0 0 1px rgba(255,255,255,.6); }
+  .gm.hub .hublab { position: absolute; left: 11px; top: -7px; white-space: nowrap; font: 600 9px 'JetBrains Mono', monospace;
+    letter-spacing: 1px; color: #46618a; background: rgba(255,253,246,.8); padding: 2px 7px; border-radius: 999px; }
+  @keyframes gpulse { 50% { box-shadow: 0 0 0 7px rgba(201,168,76,.1), 0 0 20px 6px rgba(201,168,76,.4); } }
+
+  #emptymap { position: absolute; top: 130px; left: 38px; max-width: 300px; display: flex;
+    flex-direction: column; gap: 12px; color: var(--muted); pointer-events: none; transition: opacity .5s; }
+  #emptymap .big { font-family: 'Fraunces', serif; font-style: italic; font-size: 30px; color: var(--ink); line-height: 1.1; }
+  #emptymap .sub { font-size: 13.5px; line-height: 1.6; }
+
+  /* ---------- CONSOLE (bottom-left) ---------- */
+  #console { position: absolute; left: 38px; bottom: 34px; z-index: 6; width: 430px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px; backdrop-filter: blur(16px);
+    box-shadow: 0 16px 44px rgba(90,70,20,.14); overflow: hidden; }
+  #conhead { display: flex; align-items: center; justify-content: space-between; padding: 11px 15px;
+    border-bottom: 1px solid rgba(168,132,44,.12); }
+  #contitle { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 3px; color: var(--muted); }
+  #conbtns { display: flex; gap: 6px; }
+  #conbtns button { background: none; border: 1px solid var(--line); color: var(--gold); border-radius: 8px;
+    padding: 6px 10px; font-size: 9px; font-weight: 700; letter-spacing: 1px; cursor: pointer;
+    font-family: 'JetBrains Mono', monospace; }
+  #conbtns button:hover { background: var(--gold); color: #fffbef; }
+  #conbody { padding: 13px 15px 15px; transition: max-height .35s ease, padding .35s, opacity .3s; max-height: 50vh; overflow: hidden; }
+  #console.folded #conbody { max-height: 0; padding-top: 0; padding-bottom: 0; opacity: 0; }
+  #console.folded #collapse { transform: rotate(180deg); }
+  #chips { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 11px; }
+  .chip { background: rgba(255,255,255,.6); border: 1px solid var(--line); color: var(--gold); border-radius: 999px;
+    padding: 7px 13px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: 'Manrope', sans-serif; }
+  .chip:hover { background: #fff; }
+  #log { display: flex; flex-direction: column; gap: 7px; margin-bottom: 12px; max-height: 22vh; overflow-y: auto; }
+  #log:empty { margin: 0; }
+  .entry { position: relative; font-size: 12px; line-height: 1.5; padding: 9px 28px 9px 13px; border-radius: 11px;
+    background: rgba(255,255,255,.7); border: 1px solid rgba(168,132,44,.15); }
+  .entry.user { border-left: 2px solid var(--gold); }
+  .entry.agent { color: #5d5743; }
+  .entry .del { position: absolute; top: 6px; right: 8px; width: 16px; height: 16px; line-height: 14px;
+    text-align: center; border-radius: 50%; color: var(--muted); cursor: pointer; opacity: 0; }
+  .entry:hover .del { opacity: 1; }
+  #inputrow { display: flex; align-items: center; gap: 9px; background: rgba(255,255,255,.85);
+    border: 1px solid var(--line); border-radius: 999px; padding: 5px 5px 5px 18px; }
+  #inputrow:focus-within { border-color: var(--gold); box-shadow: 0 8px 26px rgba(168,132,44,.2); }
+  #prompt { flex: 1; background: none; border: none; outline: none; color: var(--ink); font-size: 13px; font-family: 'Manrope', sans-serif; }
+  #prompt::placeholder { color: var(--muted); }
+  #send { background: linear-gradient(135deg, var(--gold-bright), var(--gold)); color: #fffbef; border: none;
+    border-radius: 999px; padding: 10px 20px; font-weight: 700; font-size: 11.5px; letter-spacing: 1px; cursor: pointer; }
+  #send:disabled { opacity: .4; }
+  #status { margin-top: 10px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--gold); letter-spacing: 1px; min-height: 14px; }
+
+  /* ---------- RIGHT: RESULT CARD ---------- */
+  #panel { position: fixed; top: 0; right: 0; z-index: 8; width: 500px; height: 100vh;
+    background: linear-gradient(270deg, rgba(253,251,245,.99), rgba(251,248,240,.97));
+    border-left: 1px solid var(--line); backdrop-filter: blur(20px); box-shadow: -28px 0 70px rgba(90,70,20,.16);
+    overflow-y: auto; padding: 34px 34px 40px; transform: translateX(102%);
+    transition: transform .7s cubic-bezier(.22,1,.3,1); }
+  #panel.open { transform: none; }
+  #panelclose { position: fixed; top: 18px; left: 18px; z-index: 9; width: 36px; height: 36px; border-radius: 50%;
+    border: 1px solid var(--line); background: rgba(255,255,255,.85); color: var(--muted); font-size: 17px; cursor: pointer;
+    display: none; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
+  #panel.open ~ #panelclose, body.has-result #panelclose { display: flex; }
+  #panelclose:hover { color: var(--ink); background: #fff; }
+  #waiting { display: none; }
+  #waiting .lg { font-family: 'Fraunces', serif; font-style: italic; font-size: 24px; color: #b7ad96; margin-bottom: 10px; }
+  #result { display: none; }
+  .rrow { display: flex; align-items: baseline; justify-content: space-between; }
+  .eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 3px; color: var(--gold); }
+  #badge { font-size: 9.5px; letter-spacing: 1.5px; font-weight: 700; }
+  #badge.live { color: #3a7d44; } #badge.offline { color: #b07c2c; }
+  #badge::before { content: '● '; } #badge:empty::before { content: ''; }
+  #pickname { font-family: 'Fraunces', serif; font-weight: 300; font-size: 38px; line-height: 1.05; margin: 12px 0 4px; }
+  #pickmeta { font-size: 12px; color: var(--muted); }
+  #flyto { color: var(--gold); cursor: pointer; border-bottom: 1px dotted var(--line); }
+  #flyto:hover { color: var(--ink); }
+  #memoblock summary { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 2.5px;
+    color: var(--muted); cursor: pointer; list-style: none; }
+  #memoblock summary::-webkit-details-marker { display: none; }
+  #memoblock summary::before { content: '▸ '; color: var(--gold); }
+  #memoblock[open] summary::before { content: '▾ '; }
+  #memoblock #memo { margin-top: 12px; }
+  #satline { display: flex; align-items: center; gap: 12px; font-size: 12.5px; color: #44402f;
+    padding: 11px 13px; background: rgba(91,127,166,.08); border-left: 2px solid #5b7fa6; border-radius: 0 8px 8px 0; }
+  #satline .sv { font-family: 'Fraunces', serif; font-size: 22px; color: #46618a; }
+  #satline .meta { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: var(--muted); }
+  #scorebar { display: flex; align-items: center; gap: 14px; margin: 18px 0; padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  #scorenum { font-family: 'Fraunces', serif; font-size: 44px; color: var(--gold); line-height: 1; }
+  #scorenum small { font-size: 13px; color: var(--muted); }
+  #why { flex: 1; font-size: 13px; line-height: 1.5; color: #44402f; }
+  #why b { color: var(--ink); }
+
+  .block { margin-top: 22px; }
+  .block h3 { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 2.5px; color: var(--muted); margin-bottom: 12px; }
+  /* compare bars */
+  .cmp { display: grid; grid-template-columns: 108px 1fr 1fr 1fr; gap: 9px 10px; align-items: center; font-size: 11px; }
+  .cmp .axis { color: #5d5743; font-weight: 600; font-size: 10.5px; display: flex; flex-direction: column; }
+  .cmp .axis .aval { color: var(--gold); font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 400; margin-top: 1px; }
+  .cmp .reg { font-weight: 600; font-size: 10px; text-align: center; color: #5d5743; padding-bottom: 3px; }
+  .cmp .reg.win { color: var(--gold); }
+  .cbar { height: 7px; background: rgba(168,132,44,.12); border-radius: 4px; overflow: hidden; }
+  .cbar > span { display: block; height: 100%; background: var(--gold-bright); border-radius: 4px; }
+  .cmp .col0 .cbar > span { background: var(--gold); }
+  /* power */
+  #powerstats { display: flex; gap: 16px; margin-bottom: 12px; }
+  #powerstats .num { font-family: 'Fraunces', serif; font-size: 24px; color: var(--gold); }
+  #powerstats .lbl { font-size: 9.5px; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-top: 1px; }
+  #powerplan { font-size: 12.5px; line-height: 1.55; color: #44402f; padding: 11px 13px;
+    background: rgba(168,132,44,.07); border-left: 2px solid var(--gold); border-radius: 0 8px 8px 0; }
+  /* ruled out */
+  #ruled { font-size: 12px; color: #44402f; line-height: 1.5; }
+  .tag { display: inline-block; border: 1px solid rgba(168,132,44,.3); color: #97793a; background: rgba(255,255,255,.5);
+    border-radius: 6px; padding: 3px 8px; font-size: 10px; margin: 5px 5px 0 0; }
+  /* sliders */
+  .sliderrow { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+  .sliderrow label { width: 92px; font-size: 11.5px; font-weight: 600; color: #5d5743; }
+  .sliderrow input[type=range] { flex: 1; appearance: none; height: 3px; border-radius: 2px; background: rgba(168,132,44,.25); outline: none; }
+  .sliderrow input[type=range]::-webkit-slider-thumb { appearance: none; width: 14px; height: 14px; border-radius: 50%;
+    background: var(--gold); cursor: pointer; border: 2.5px solid #fffbef; }
+  .sliderrow .pct { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--gold); width: 34px; text-align: right; }
+  .sizerow { display: flex; align-items: center; gap: 10px; margin: 12px 0 4px; }
+  .sizerow label { width: 92px; font-size: 11.5px; font-weight: 600; color: #5d5743; }
+  .sizerow input { width: 70px; background: rgba(255,255,255,.7); border: 1px solid var(--line); border-radius: 8px;
+    padding: 6px 9px; font-size: 12px; font-family: 'JetBrains Mono', monospace; outline: none; }
+  .sizerow input:focus { border-color: var(--gold); }
+  .sizerow span { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+  #refine { margin-top: 12px; background: none; border: 1px solid var(--gold); color: var(--gold); border-radius: 999px;
+    padding: 9px 20px; font-size: 11px; font-weight: 700; letter-spacing: 1px; cursor: pointer; font-family: 'Manrope', sans-serif; }
+  #refine:hover { background: var(--gold); color: #fffbef; }
+  .note { font-size: 11.5px; color: var(--gold); font-style: italic; margin-bottom: 8px; }
+  #memo { font-size: 12.5px; line-height: 1.55; color: #44402f; }
+  #memo ul { list-style: none; padding: 0; margin: 0; }
+  #memo li { position: relative; padding-left: 16px; margin-bottom: 8px; }
+  #memo li::before { content: '—'; position: absolute; left: 0; color: var(--gold); }
+  #sources { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line);
+    font-family: 'JetBrains Mono', monospace; font-size: 9.5px; line-height: 1.7; color: var(--muted); letter-spacing: .3px; }
+  #sources b { color: var(--gold); }
+
+  /* dive overlay */
+  #dive { position: fixed; inset: 0; z-index: 30; background: var(--bg); opacity: 0; pointer-events: none;
+    display: flex; align-items: center; justify-content: center; transition: opacity .3s; }
+  #dive.on { opacity: 1; pointer-events: auto; }
+  #dive .ring { position: absolute; border: 2px solid var(--gold); border-radius: 50%; opacity: 0; }
+  #dive.on .ring { animation: warp 1.4s ease-in forwards; }
+  #dive .ring:nth-child(2) { animation-delay: .12s; } #dive .ring:nth-child(3) { animation-delay: .24s; }
+  @keyframes warp { 0% { width: 12px; height: 12px; opacity: .9; } 100% { width: 160vmax; height: 160vmax; opacity: 0; } }
+  #dive .lbl { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 3px; color: var(--gold); z-index: 2; }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <div id="brand"><h1>Autonomous Siting Agent</h1><p>SITE INTELLIGENCE · EUROPE</p></div>
+  <div id="zoomctl">
+    <button id="zin" title="Zoom in">+</button>
+    <button id="zout" title="Zoom out">−</button>
+    <button id="zreset" title="Reset view">⟳</button>
+  </div>
+  <div id="globe"></div>
+  <div id="legend">
+    <span><i class="lg-win"></i> Recommended</span>
+    <span><i class="lg-site"></i> Shortlist</span>
+    <span><i class="lg-hub"></i> Internet exchange / fibre hub</span>
+    <span style="margin-top:4px"><b style="color:#5d5743">Suitable data center location:</b></span>
+    <span><span class="heatbar"></span></span>
+    <span style="font-size:9px;letter-spacing:.5px;color:var(--muted)">poor&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;good</span>
+  </div>
+  <div id="emptymap">
+    <div class="big">Where should it be built?</div>
+    <div class="sub">Describe your data center below — size, budget, and what matters most. The agent will rank Europe's regions and explain the trade-off.</div>
+  </div>
+
+  <div id="console">
+    <div id="conhead"><span id="contitle">CONVERSATION</span>
+      <div id="conbtns"><button id="clearchat">CLEAR</button><button id="collapse">▾</button></div>
+    </div>
+    <div id="conbody">
+      <div id="chips">
+        <button class="chip">Greenest & cheapest, 100MW</button>
+        <button class="chip">2GW campus, biggest grid</button>
+        <button class="chip">Next to internet exchange, 80MW</button>
+      </div>
+      <div id="log"></div>
+      <div id="inputrow">
+        <input id="prompt" placeholder="Describe your data center — size, budget, priorities..." />
+        <button id="send">ASK</button>
+      </div>
+      <div id="status"></div>
+    </div>
+  </div>
+</div>
+
+<div id="panel">
+  <div id="result">
+    <div class="rrow"><span class="eyebrow">RECOMMENDED LOCATION</span><span id="badge"></span></div>
+    <div id="pickname"></div>
+    <div id="pickmeta"></div>
+    <div id="scorebar"><div id="scorenum"></div><div id="why"></div></div>
+
+    <div class="block"><h3>WHY THIS ONE — TOP 3 COMPARED</h3><div class="cmp" id="cmp"></div></div>
+
+    <div class="block" id="satblock" style="display:none"><h3>SATELLITE-VERIFIED</h3>
+      <div id="satline"></div>
+    </div>
+
+
+    <div class="block" id="powerblock"><h3>HOW TO POWER IT</h3>
+      <div id="powerstats"></div><div id="powerplan"></div>
+    </div>
+
+    <div class="block"><h3>RULED OUT BEFORE RANKING</h3><div id="ruled"></div></div>
+
+    <div class="block"><h3>ADJUST & RE-RANK</h3>
+      <div class="sliderrow"><label>Low cost</label><input type="range" id="w_cost" min="0" max="100"><span class="pct"></span></div>
+      <div class="sliderrow"><label>Clean energy</label><input type="range" id="w_green" min="0" max="100"><span class="pct"></span></div>
+      <div class="sliderrow"><label>Grid capacity</label><input type="range" id="w_grid" min="0" max="100"><span class="pct"></span></div>
+      <div class="sliderrow"><label>Connectivity</label><input type="range" id="w_conn" min="0" max="100"><span class="pct"></span></div>
+      <div class="sizerow"><label>Facility size</label><input type="number" id="size_mw" min="1" placeholder="e.g. 80"><span>MW</span></div>
+      <button id="refine">UPDATE RANKING</button>
+    </div>
+
+    <details class="block" id="memoblock"><summary>AGENT MEMO — full reasoning</summary><div id="memonote"></div><div id="memo"></div></details>
+    <div id="sources"></div>
+  </div>
+</div>
+<button id="panelclose" title="Back to globe">✕</button>
+
+<div id="dive"><div class="ring"></div><div class="ring"></div><div class="ring"></div><div class="lbl"></div></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const HUB = { lat: 50.11, lon: 8.68 };
+const AXES = [
+  ['cost_lcoe', 'Low cost', r => `€${r.cost_lcoe.toFixed(3)}/kWh`],
+  ['grid_capacity_mw', 'Grid headroom', (r, s) => `${s.spare_headroom_mw.toLocaleString()} MW`],
+  ['green_share_pct', 'Clean energy', r => `${Math.round(r.green_share_pct)}%`],
+  ['connectivity_score', 'Connectivity', r => `${Math.round(r.connectivity_score)}/100`],
+];
+const STEPS = ['READING YOUR BRIEF','RANKING EUROPE','WRITING THE MEMO'];
+const CHIP_BRIEFS = {
+  'Greenest & cheapest, 100MW': 'A 100MW data center — I want the cleanest grid AND the lowest electricity cost, both matter most. Carbon-free is important.',
+  '2GW campus, biggest grid': 'I am building a massive 2000MW AI training campus. I need the single largest grid capacity that can physically handle it.',
+  'Next to internet exchange, 80MW': 'An 80MW low-latency inference site. The only thing that matters is being right next to the biggest European internet exchange.',
+};
+let lastData = null;
+
+// --- premium globe, framed on Europe, with data-center / fibre hub layer ---
+const DC_HUBS = [
+  ['Frankfurt', 8.68, 50.11], ['London', -0.13, 51.51], ['Amsterdam', 4.90, 52.37],
+  ['Paris', 2.35, 48.86], ['Dublin', -6.27, 53.34], ['Madrid', -3.70, 40.42],
+  ['Milan', 9.19, 45.46], ['Warsaw', 21.01, 52.23], ['Stockholm', 18.07, 59.33],
+  ['Copenhagen', 12.57, 55.68], ['Vienna', 16.37, 48.21],
+];
+const EUR_POV = { lat: 50, lng: 10, altitude: 2.2 };
+
+function gmarker(d) {
+  const el = document.createElement('div');
+  el.className = `gm ${d.kind}`;
+  if (d.kind === 'hub') {
+    el.innerHTML = `<span class="hubdot"></span><span class="hublab">${d.text} IX</span>`;
+    el.title = d.text + ' — nearest internet exchange';
+  } else {
+    el.innerHTML = `<span class="dot"></span><span class="lab"><span class="rk">${d.rk}</span>${d.text}</span>`;
+    el.dataset.region = d.text;
+    el.onclick = () => dive(d.text);
+  }
+  return el;
+}
+
+const globe = Globe()($('globe'))
+  .globeImageUrl('vendor/earth-day.jpg')
+  .bumpImageUrl('vendor/earth-topology.png')
+  .backgroundColor('rgba(0,0,0,0)')
+  .atmosphereColor('#9db8dd').atmosphereAltitude(0.22)
+  .width(0).height(0)
+  .pointOfView(EUR_POV)
+  .htmlElementsData([]).htmlLat('lat').htmlLng('lng').htmlElement(gmarker).htmlAltitude(0.012)
+  .pointsData(DC_HUBS.map(([name, lon, lat]) => ({ name, lat, lon })))
+  .pointLat('lat').pointLng('lon').pointColor(() => '#5b8fd6')
+  .pointAltitude(0.012).pointRadius(0.34).pointResolution(8)
+  .labelsData([]).labelLat('lat').labelLng('lng').labelText('text')
+  .labelSize(0.42).labelDotRadius(0).labelColor(() => 'rgba(255,255,255,0.92)').labelAltitude(0.014)
+  .labelResolution(2)
+  .ringsData([]);
+
+function sizeGlobe() {
+  globe.width(window.innerWidth).height(window.innerHeight);
+}
+globe.onGlobeReady(() => { sizeGlobe(); $('globe').classList.add('on'); });
+window.addEventListener('resize', sizeGlobe);
+globe.controls().autoRotate = true;
+globe.controls().autoRotateSpeed = 0.3;
+globe.controls().enableZoom = true;
+globe.controls().minDistance = 160;
+globe.controls().maxDistance = 380;
+
+function addEntry(role, text) {
+  const div = document.createElement('div');
+  div.className = 'entry ' + role; div.textContent = text;
+  const del = document.createElement('span'); del.className = 'del'; del.textContent = '×';
+  del.onclick = () => div.remove(); div.appendChild(del);
+  $('log').appendChild(div); $('log').scrollTop = $('log').scrollHeight;
+}
+
+function whyLine(top, runner) {
+  const p = top.profile, raw = top.raw, strong = [];
+  if (p.cost_lcoe >= .6) strong.push(`power at €${(raw.cost_lcoe).toFixed(3)}/kWh`);
+  if (p.green_share_pct >= .6) strong.push(`${Math.round(raw.green_share_pct)}% clean energy`);
+  if (p.grid_capacity_mw >= .6) strong.push(`${top.spare_headroom_mw.toLocaleString()} MW spare grid`);
+  if (p.connectivity_score >= .6) strong.push('strong hub connectivity');
+  const lead = strong.length ? strong.slice(0, 2).join(' and ') : 'the best all-round balance';
+  return `Wins on <b>${lead}</b>` + (runner ? `, ahead of ${runner.region.split(' — ')[0]}.` : '.');
+}
+
+let winFocus = EUR_POV;
+let decollideRunning = false;
+let lastRanking = null;
+
+// Runs every frame: lay each region label beside its pin, then push apart any that overlap.
+// This adapts to any camera angle/zoom, so labels never collide regardless of how regions cluster.
+function decollide() {
+  const gms = [...$('globe').querySelectorAll('.gm:not(.hub)')];
+  if (!gms.length) { decollideRunning = false; return; }
+  const stageRight = $('stage').getBoundingClientRect().right;
+  // seed each label at a rank-based vertical offset so clustered pins start already separated
+  const seed = { 'i': -9, 'ii': -34, 'iii': 17 };
+  const items = gms.map(el => {
+    const lab = el.querySelector('.lab');
+    const flip = el.getBoundingClientRect().left > stageRight - 220;  // flip near right edge
+    el.classList.toggle('flip', flip);
+    lab.style.left = flip ? 'auto' : '13px';
+    lab.style.right = flip ? '13px' : 'auto';
+    const rk = el.querySelector('.rk')?.textContent || 'i';
+    lab.style.top = (seed[rk] ?? -9) + 'px';
+    return { el, lab };
+  });
+  // include the Frankfurt hub label so winner/runner pills never collide with it
+  const hub = $('globe').querySelector('.gm.hub .lab');
+  if (hub) items.push({ el: hub.parentElement, lab: hub });
+  // resolve overlaps by nudging vertically; if two still collide, hide the lower-ranked label
+  // (its name is in the card) — guarantees the globe is never cluttered.
+  items.forEach(it => it.lab.style.visibility = 'visible');
+  for (let pass = 0; pass < 4; pass++) {
+    for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) {
+      const A = items[i], B = items[j];
+      if (A.lab.style.visibility === 'hidden' || B.lab.style.visibility === 'hidden') continue;
+      const a = A.lab.getBoundingClientRect(), b = B.lab.getBoundingClientRect();
+      if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) {
+        const push = (Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)) / 2 + 2;
+        const lower = a.top < b.top ? B : A, upper = a.top < b.top ? A : B;
+        lower.lab.style.top = (parseFloat(lower.lab.style.top || -9) + push) + 'px';
+        upper.lab.style.top = (parseFloat(upper.lab.style.top || -9) - push) + 'px';
+      }
+    }
+  }
+  // final check: any still-overlapping pair -> hide the one whose rank is higher (less important)
+  for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) {
+    const A = items[i], B = items[j];
+    if (A.lab.style.visibility === 'hidden' || B.lab.style.visibility === 'hidden') continue;
+    const a = A.lab.getBoundingClientRect(), b = B.lab.getBoundingClientRect();
+    if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) {
+      const rankA = A.el.querySelector('.rk')?.textContent || '';
+      const rankB = B.el.querySelector('.rk')?.textContent || '';
+      (rankA.length >= rankB.length ? A : B).lab.style.visibility = 'hidden';
+    }
+  }
+  requestAnimationFrame(decollide);
+}
+
+function heatColor(score, min, max) {
+  const t = max > min ? (score - min) / (max - min) : 0.5;  // 0 = worst, 1 = best
+  const h = t * 120;  // red (0°) -> yellow (60°) -> green (120°)
+  return `hsl(${h}, 75%, 52%)`;
+}
+
+function heatColorAlpha(score, min, max, a) {
+  const t = max > min ? (score - min) / (max - min) : 0.5;
+  const r = t < 0.5 ? 220 : Math.round(220 - (t - 0.5) * 2 * 160);
+  const g = t < 0.5 ? Math.round(60 + t * 2 * 150) : 210;
+  return `rgba(${r},${g},60,${a})`;
+}
+
+let europeGeo = null;
+fetch('vendor/europe.geojson').then(r => r.json()).then(g => { europeGeo = g; });
+
+function drawMap(sites, heatmap) {
+  $('emptymap').style.display = 'none';
+  $('legend').classList.add('on');
+  const win = sites[0];
+  winFocus = { lat: win.lat - 1, lng: win.lon, altitude: 1.1 };
+  globe.controls().autoRotate = false;
+  globe.pointOfView(winFocus, 1600);
+
+  // country-level heat map: color each country's MAIN landmass red(poor) -> green(good)
+  if (heatmap && heatmap.length && europeGeo) {
+    const byCountry = {};
+    heatmap.forEach(h => { byCountry[h.country] = Math.max(byCountry[h.country] ?? 0, h.score); });
+    const vals = Object.values(byCountry);
+    const mn = Math.min(...vals), mx = Math.max(...vals);
+    // keep only ranked countries, and drop overseas territories (only the European-area polygons)
+    const ranked = europeGeo.features.filter(f => byCountry[f.properties.ISO2] != null);
+    const feats = ranked.map(f => mainEuropePolygon(f));
+    globe.polygonsData(feats)
+      .polygonCapColor(f => heatColorAlpha(byCountry[f.properties.ISO2], mn, mx, 0.58))
+      .polygonSideColor(() => 'rgba(0,0,0,0)')
+      .polygonStrokeColor(() => 'rgba(255,255,255,0.3)')
+      .polygonAltitude(0.004);
+    // country name labels at each ranked country's centroid
+    globe.labelsData(ranked.map(f => ({
+      lat: f.properties.LAT, lng: f.properties.LON, text: f.properties.NAME,
+    })));
+  }
+
+  const markers = sites.map((s, i) => ({
+    lat: s.lat, lng: s.lon, text: s.region.split(' — ')[0],
+    kind: i === 0 ? 'win' : 'site', rk: ['i', 'ii', 'iii'][i] || (i + 1),
+  }));
+  globe.htmlElementsData(markers);
+  if (!decollideRunning) { decollideRunning = true; requestAnimationFrame(decollide); }
+
+  globe.ringsData([{ lat: win.lat, lng: win.lon }])
+    .ringMaxRadius(3).ringPropagationSpeed(1.2).ringRepeatPeriod(1200)
+    .ringColor(() => t => `rgba(201,168,76,${0.55 * (1 - t)})`);
+
+  globe.arcsData([]);
+}
+
+// keep only a country's main European-area polygon (drops overseas territories far from Europe)
+function mainEuropePolygon(f) {
+  if (f.geometry.type !== 'MultiPolygon') return f;
+  const inEurope = ([lon, lat]) => lon > -32 && lon < 45 && lat > 33 && lat < 73;
+  const polys = f.geometry.coordinates.filter(poly => {
+    const ring = poly[0];
+    const c = ring[Math.floor(ring.length / 2)];
+    return inEurope(c);
+  });
+  return { ...f, geometry: { type: 'MultiPolygon', coordinates: polys.length ? polys : f.geometry.coordinates } };
+}
+
+function nearestHub(lat, lon) {
+  let best = null, bestD = Infinity;
+  for (const [name, hlon, hlat] of DC_HUBS) {
+    const d = (lat - hlat) ** 2 + (lon - hlon) ** 2;
+    if (d < bestD) { bestD = d; best = { name, lat: hlat, lon: hlon }; }
+  }
+  return best;
+}
+
+function dive(name) {
+  if (!lastRanking) return;
+  const t = lastRanking.find(r => r.region.split(' — ')[0] === name) || lastRanking[0];
+  globe.controls().autoRotate = false;
+  globe.pointOfView({ lat: t.lat - 1, lng: t.lon, altitude: 0.45 }, 1400);
+  setTimeout(() => globe.pointOfView(winFocus, 1300), 2600);
+}
+
+function bar(v) { return `<div class="cbar"><span style="width:${Math.round(v * 100)}%"></span></div>`; }
+
+function render(raw, memoText, source) {
+  const r = raw.ranking, top = r[0];
+  lastRanking = r;
+  $('emptymap').style.display = 'none';
+  $('result').style.display = 'block';
+  $('panel').classList.add('open');
+  document.body.classList.add('has-result');
+  const topName = top.region.split(' — ')[0];
+  $('pickname').textContent = topName;
+  $('pickmeta').innerHTML = `${top.country} · ${top.substations} grid substations · <span id="flyto">zoom in ↗</span>`;
+  $('flyto').onclick = () => dive(topName);
+  $('scorenum').innerHTML = `${Math.round(top.score * 100)}<small>/100</small>`;
+  $('why').innerHTML = whyLine(top, r[1]);
+  if (source) { $('badge').textContent = source === 'live' ? 'LIVE AGENT' : 'OFFLINE'; $('badge').className = source; }
+
+  // compare grid — winner's real value shown beside each axis
+  let cmp = `<div class="axis"></div>` + r.map((s, i) => `<div class="reg ${i === 0 ? 'win' : ''}">${s.region.split(' — ')[0].slice(0, 12)}</div>`).join('');
+  AXES.forEach(([key, label, fmt]) => {
+    cmp += `<div class="axis">${label}<span class="aval">${fmt(top.raw, top)}</span></div>` + r.map((s, i) => `<div class="col${i}">${bar(s.profile[key])}</div>`).join('');
+  });
+  $('cmp').innerHTML = cmp;
+
+  // satellite enrichment (only when Earth Engine is authed; hides otherwise)
+  if (top.satellite && top.satellite.infra_score != null) {
+    const s = top.satellite;
+    const band = s.infra_score >= 66 ? 'HIGH' : s.infra_score >= 33 ? 'MODERATE' : 'LOW';
+    $('satblock').style.display = '';
+    $('satline').innerHTML = `<span class="sv">${band}</span>
+      <span>satellite-measured similarity to a data-center hub.
+      <br><span class="meta">${s.source}</span></span>`;
+  } else $('satblock').style.display = 'none';
+
+  // power
+  if (top.supply_plan && raw.facility) {
+    $('powerblock').style.display = ''; const sp = top.supply_plan;
+    $('size_mw').value = raw.facility.size_mw;
+    $('powerstats').innerHTML = `
+      <div><div class="num">${sp.grid_draw_mw}</div><div class="lbl">MW DRAW</div></div>
+      <div><div class="num">${sp.annual_consumption_gwh}</div><div class="lbl">GWh/YR</div></div>
+      <div><div class="num">${sp.grid_share_pct}%</div><div class="lbl">GRID CLEAN</div></div>`;
+    let plan = sp.recommendation;
+    if (raw.meta_undersized_filtered > 0) plan += ` ${raw.meta_undersized_filtered} regions were too small for this ${sp.grid_draw_mw} MW load.`;
+    $('powerplan').textContent = plan;
+  } else $('powerblock').style.display = 'none';
+
+  // ruled out
+  const env = raw.meta_total_environmental_filtered, und = raw.meta_undersized_filtered;
+  let ruled = `<b>${env}</b> sites sit in protected Natura 2000 reserves` + (und ? `, <b>${und}</b> lacked grid headroom for the load` : '') + '.';
+  ruled += '<div>' + raw.filtered_out.slice(0, 4).map(f => `<span class="tag">${f.region}</span>`).join('') + '</div>';
+  $('ruled').innerHTML = ruled;
+
+  // sliders
+  const w = raw.weights_applied || {};
+  [['w_cost','weight_cost'],['w_green','weight_green'],['w_grid','weight_grid'],['w_conn','weight_connectivity']].forEach(([id, k]) => {
+    const v = Math.round((w[k] || .25) * 100); $(id).value = v; $(id).nextElementSibling.textContent = v + '%';
+  });
+
+  // memo — rendered as short bullet points
+  if (memoText !== null) {
+    const clean = memoText.replace(/\*\*/g, '').replace(/^#+\s*/gm, '');
+    const items = clean.split('\n').map(l => l.replace(/^\s*[-•]\s*/, '').trim())
+      .filter(l => l && !/^Here is|^Based on/i.test(l));
+    $('memo').innerHTML = '<ul>' + items.map(l => `<li>${l}</li>`).join('') + '</ul>';
+    $('memonote').innerHTML = '';
+  } else $('memonote').innerHTML = '<div class="note">Priorities adjusted by hand — ranking updated; memo describes the original run.</div>';
+
+  if (raw.data_sources) {
+    const a = raw.assumptions || {};
+    $('sources').innerHTML = `<b>DATA</b> ${raw.data_sources}<br><b>ASSUMPTIONS</b> PUE ${a.pue}, load factor ${a.load_factor} (${a.source || 'IEA'})`;
+  }
+
+  drawMap(r, raw.heatmap);
+  $('panel').scrollTop = 0;
+}
+
+let busy = false;
+function setBusy(b) {
+  busy = b;
+  $('send').disabled = b;
+  document.querySelectorAll('.chip').forEach(c => c.style.pointerEvents = b ? 'none' : '');
+  document.querySelectorAll('.chip').forEach(c => c.style.opacity = b ? '.4' : '');
+}
+
+async function handleSend(text) {
+  if (busy) return;
+  text = (text || $('prompt').value).trim(); if (!text) return;
+  $('prompt').value = ''; setBusy(true);
+  addEntry('user', text);
+  let i = 0; $('status').textContent = STEPS[0];
+  const timer = setInterval(() => { i = (i + 1) % STEPS.length; $('status').textContent = STEPS[i]; }, 1200);
+  try {
+    const resp = await fetch('/ask_agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: text }) });
+    const data = await resp.json();
+    if (!data.raw_result || !data.raw_result.ranking || !data.raw_result.ranking.length) {
+      addEntry('agent', data.memo || 'Tell me a bit more — a size, budget, or what matters most (cost, clean energy, grid, connectivity).');
+    } else {
+      addEntry('agent', `Recommended: ${data.raw_result.ranking[0].region.split(' — ')[0]}`);
+      render(data.raw_result, data.memo, data.source);
+    }
+  } catch (e) { addEntry('agent', 'Could not reach the engine — is the backend running?'); }
+  finally { clearInterval(timer); $('status').textContent = ''; setBusy(false); }
+}
+
+async function refine() {
+  const size = parseFloat($('size_mw').value);
+  const body = {
+    weight_cost: $('w_cost').value / 100, weight_green: $('w_green').value / 100,
+    weight_grid: $('w_grid').value / 100, weight_connectivity: $('w_conn').value / 100,
+    size_mw: size > 0 ? size : null,
+  };
+  const resp = await fetch('/optimize_site', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!resp.ok) { $('powerplan').textContent = (await resp.json()).detail; $('powerblock').style.display = ''; return; }
+  render(await resp.json(), null);
+}
+
+document.querySelectorAll('.sliderrow input').forEach(s => s.oninput = () => s.nextElementSibling.textContent = s.value + '%');
+document.querySelectorAll('.chip').forEach(c => c.onclick = () => handleSend(CHIP_BRIEFS[c.textContent]));
+$('refine').onclick = refine;
+$('send').onclick = () => handleSend();
+$('prompt').onkeydown = e => { if (e.key === 'Enter') handleSend(); };
+$('clearchat').onclick = () => { $('log').innerHTML = ''; $('status').textContent = ''; };
+$('collapse').onclick = () => $('console').classList.toggle('folded');
+
+function zoom(f) { const v = globe.pointOfView(); globe.pointOfView({ ...v, altitude: Math.min(2.6, Math.max(0.35, v.altitude * f)) }, 500); }
+$('zin').onclick = () => zoom(0.7);
+$('zout').onclick = () => zoom(1.4);
+$('zreset').onclick = () => { globe.controls().autoRotate = true; globe.pointOfView(EUR_POV, 900); };
+$('panelclose').onclick = () => {
+  $('panel').classList.remove('open');
+  document.body.classList.remove('has-result');
+  globe.controls().autoRotate = true;
+  globe.pointOfView(EUR_POV, 1200);
+};
+</script>
+</body>
+</html>
