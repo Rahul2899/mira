@@ -280,27 +280,31 @@
 
     /* hero above the globe */
     #emptymap { position: static; transform: none; width: 100%; max-width: none; order: 2;
-      padding: 6px 4px 0; left: auto; top: auto; opacity: 1 !important; }
-    #emptymap .big { font-size: 22px; line-height: 1.15; }
-    #emptymap .sub { max-width: none; font-size: 12.5px; }
+      padding: 14px 4px 0; left: auto; top: auto; opacity: 1 !important; gap: 9px; }
+    #emptymap .big { font-size: 23px; line-height: 1.15; }
+    #emptymap .sub { max-width: none; font-size: 12.5px; line-height: 1.5; }
 
     /* globe: full-width square block in the flow */
     #globe { position: relative !important; left: auto !important; top: auto !important;
-      transform: none !important; margin: 10px auto 0; order: 3; }
-    #halo { display: none; }               /* glow doesn't read well behind a small inline globe */
+      transform: none !important; margin: 18px auto 6px; order: 3; }
+    /* tuned halo behind the inline globe — absolute so it scrolls with the page (JS positions it) */
+    #halo { position: absolute; transform: translate(-50%, -50%); }
 
     /* console: full-width card in the flow */
     #console { position: static !important; transform: none !important; left: auto !important;
-      bottom: auto; width: 100%; max-width: 100%; margin: 16px 0 0; border-radius: 16px; order: 4;
+      bottom: auto; width: 100%; max-width: 100%; margin: 22px 0 0; border-radius: 18px; order: 4;
       animation: none; }
     body.has-result #console { width: 100%; }
-    body.has-result #chips, body.has-result #log { display: flex; }  /* keep chips on mobile */
-    #chips { flex-wrap: wrap; }
-    .chip { font-size: 10.5px; padding: 6px 11px; }
-    #conbody { padding: 12px; }
-    #conhead { padding: 10px 12px; }
-    #contitle { letter-spacing: 2px; }
+    #conhead { display: none; }   /* the CONVERSATION header + caret are desktop affordances */
+    body.has-result #chips, body.has-result #log { display: flex; }
+    /* chips: a single horizontally-scrollable row instead of three fat stacked bars */
+    #chips { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
+      margin-bottom: 13px; padding-bottom: 3px; scrollbar-width: none; }
+    #chips::-webkit-scrollbar { display: none; }
+    .chip { flex: 0 0 auto; font-size: 11px; padding: 8px 14px; white-space: nowrap; }
+    #conbody { padding: 14px; }
     #prompt { min-width: 0; }   /* let the flex input shrink instead of forcing overflow */
+    #log { max-height: 30vh; }
 
     /* dossier: full-width, flows below the stage */
     #panel { position: static !important; width: 100% !important; height: auto !important;
@@ -464,10 +468,20 @@ function sizeGlobe() {
   if (MOBILE()) {
     // mobile: globe is a full-width square block in the scrolling column; the CSS handles
     // its position, so clear the desktop inline top/left that JS would otherwise set.
-    const size = Math.min(window.innerWidth - 32, Math.round(window.innerHeight * 0.5));
+    const size = Math.min(window.innerWidth - 32, Math.round(window.innerHeight * 0.46));
     el.style.width = el.style.height = size + 'px';
     el.style.top = el.style.left = '';
     globe.width(size).height(size);
+    // tuned halo: sit behind the inline globe. #halo is absolute within #stage (its positioned
+    // parent), so position it in #stage-relative coords using each element's offset within it.
+    requestAnimationFrame(() => {
+      const stage = $('stage').getBoundingClientRect();
+      const r = el.getBoundingClientRect();
+      const sphere = size * 0.58;
+      halo.style.width = halo.style.height = (sphere * 1.22) + 'px';
+      halo.style.left = (r.left - stage.left + r.width / 2) + 'px';
+      halo.style.top = (r.top - stage.top + r.height / 2) + 'px';
+    });
     return;
   }
   const hasResult = document.body.classList.contains('has-result');
