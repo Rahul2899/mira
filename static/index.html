@@ -14,32 +14,56 @@
     --bg: #f4f0e6; --ink: #211d12; --muted: #8d8470; --gold: #a8842c; --gold-bright: #c9a84c;
     --line: rgba(168,132,44,.25); --card: rgba(255,255,255,.82);
     --land: #ded3b4; --land-edge: #b8a878; --sea: #eef0ea;
+    --panel-w: 460px;            /* right dossier width */
+    --stage-center: 42%;          /* visual center of the globe stage (left of panel) */
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; overflow: hidden; }
   body { background: var(--bg); color: var(--ink); font-family: 'Manrope', sans-serif; }
 
-  /* ---------- LEFT: GLOBE ---------- */
+  /* ---------- LEFT: GLOBE STAGE ---------- */
+  /* the stage occupies the area LEFT of the dossier; the globe is centered within it,
+     not within the viewport, so Europe never hides behind the panel. */
   #stage { position: fixed; inset: 0; overflow: hidden;
-    background: radial-gradient(ellipse 60% 70% at 50% 45%, #fbf8f0 0%, var(--bg) 72%); }
-  #brand { position: absolute; top: 30px; left: 38px; z-index: 5; }
+    background:
+      radial-gradient(ellipse 52% 60% at var(--stage-center) 46%, #fcf9f1 0%, var(--bg) 70%),
+      radial-gradient(circle at var(--stage-center) 44%, rgba(168,132,44,.05), transparent 55%); }
+  body.has-result #stage { --stage-center: calc((100% - var(--panel-w)) / 2); }
+
+  /* soft premium halo behind the globe — warm gold core fading to a cool atmosphere ring */
+  #halo { position: fixed; z-index: 0; left: var(--stage-center); top: 46%;
+    width: 76vh; height: 76vh; transform: translate(-50%, -50%); pointer-events: none;
+    border-radius: 50%; opacity: 0; transition: opacity 1.6s ease, left .9s cubic-bezier(.22,1,.3,1);
+    background:
+      radial-gradient(circle, rgba(201,168,76,.20) 0%, rgba(201,168,76,.07) 38%, transparent 60%),
+      radial-gradient(circle, transparent 58%, rgba(120,150,200,.10) 64%, transparent 72%);
+    filter: blur(2px); }
+  #halo.on { opacity: 1; }
+  body.has-result #halo { left: calc((100% - var(--panel-w)) / 2); }
+  #brand { position: absolute; top: 30px; left: 38px; z-index: 5;
+    animation: rise .9s cubic-bezier(.22,1,.3,1) both; }
   #brand h1 { font-family: 'Fraunces', serif; font-style: italic; font-weight: 400; font-size: 30px; color: var(--ink); }
   #brand p { font-size: 9.5px; letter-spacing: 4px; color: var(--gold); margin-top: 5px; font-family: 'JetBrains Mono', monospace; }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+  /* centered elements animate opacity only so their translateX(-50%) is preserved */
+  @keyframes fadeUp { from { opacity: 0; } }
 
-  #globe { position: absolute; inset: 0; opacity: 0; transition: opacity 1.6s ease; }
+  #globe { position: absolute; left: 0; top: 0; opacity: 0; z-index: 1;
+    transition: opacity 1.6s ease, width .9s cubic-bezier(.22,1,.3,1); }
   #globe.on { opacity: 1; }
 
   #zoomctl { position: fixed; top: 30px; right: 34px; z-index: 9; display: flex; flex-direction: column; gap: 8px;
     transition: right .7s cubic-bezier(.22,1,.3,1); }
-  body.has-result #zoomctl { right: 534px; }
+  body.has-result #zoomctl { right: calc(var(--panel-w) + 34px); }
   #zoomctl button { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line);
     background: rgba(255,255,255,.85); color: var(--gold); font-size: 18px; cursor: pointer; backdrop-filter: blur(8px);
     box-shadow: 0 4px 14px rgba(90,70,20,.1); display: flex; align-items: center; justify-content: center; transition: all .2s; }
   #zoomctl button:hover { background: #fff; color: var(--ink); transform: scale(1.06); }
 
-  #legend { position: absolute; left: 38px; bottom: 290px; z-index: 5; display: flex; flex-direction: column; gap: 7px;
-    font-size: 10.5px; color: #d9d2c2; background: rgba(20,30,46,.6); border: 1px solid rgba(255,255,255,.12); border-radius: 10px;
-    padding: 11px 14px; backdrop-filter: blur(8px); opacity: 0; transition: opacity .5s; }
+  #legend { position: fixed; left: 30px; bottom: 30px; z-index: 5; display: flex; flex-direction: column; gap: 7px;
+    font-size: 10.5px; color: #5d5743; background: rgba(255,253,246,.78); border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px 15px; backdrop-filter: blur(10px); box-shadow: 0 8px 28px rgba(90,70,20,.1);
+    opacity: 0; transition: opacity .5s; }
   #legend.on { opacity: 1; }
   #legend span { display: flex; align-items: center; gap: 8px; }
   #legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
@@ -77,15 +101,21 @@
     letter-spacing: 1px; color: #46618a; background: rgba(255,253,246,.8); padding: 2px 7px; border-radius: 999px; }
   @keyframes gpulse { 50% { box-shadow: 0 0 0 7px rgba(201,168,76,.1), 0 0 20px 6px rgba(201,168,76,.4); } }
 
-  #emptymap { position: absolute; top: 130px; left: 38px; max-width: 300px; display: flex;
-    flex-direction: column; gap: 12px; color: var(--muted); pointer-events: none; transition: opacity .5s; }
-  #emptymap .big { font-family: 'Fraunces', serif; font-style: italic; font-size: 30px; color: var(--ink); line-height: 1.1; }
-  #emptymap .sub { font-size: 13.5px; line-height: 1.6; }
+  #emptymap { position: fixed; left: var(--stage-center); top: 96px; transform: translateX(-50%);
+    max-width: 440px; width: 80vw; text-align: center; display: flex;
+    flex-direction: column; gap: 12px; color: var(--muted); pointer-events: none; z-index: 4;
+    animation: fadeUp 1s ease .25s both; transition: opacity .5s; }
+  #emptymap .big { font-family: 'Fraunces', serif; font-style: italic; font-size: 34px; color: var(--ink); line-height: 1.12; }
+  #emptymap .sub { font-size: 13.5px; line-height: 1.6; max-width: 380px; margin: 0 auto; }
 
-  /* ---------- CONSOLE (bottom-left) ---------- */
-  #console { position: absolute; left: 38px; bottom: 34px; z-index: 6; width: 430px;
-    background: var(--card); border: 1px solid var(--line); border-radius: 16px; backdrop-filter: blur(16px);
-    box-shadow: 0 16px 44px rgba(90,70,20,.14); overflow: hidden; }
+  /* ---------- CONSOLE (docked bar, centered under the globe stage) ---------- */
+  #console { position: fixed; left: var(--stage-center); bottom: 30px; z-index: 6; width: min(520px, 46vw);
+    transform: translateX(-50%); z-index: 6;
+    background: var(--card); border: 1px solid var(--line); border-radius: 18px; backdrop-filter: blur(18px);
+    box-shadow: 0 18px 50px rgba(90,70,20,.16); overflow: hidden;
+    animation: fadeUp 1s ease .4s both;
+    transition: left .9s cubic-bezier(.22,1,.3,1), width .9s cubic-bezier(.22,1,.3,1); }
+  body.has-result #console { width: min(460px, calc((100% - var(--panel-w)) - 76px)); }
   #conhead { display: flex; align-items: center; justify-content: space-between; padding: 11px 15px;
     border-bottom: 1px solid rgba(168,132,44,.12); }
   #contitle { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 3px; color: var(--muted); }
@@ -121,7 +151,7 @@
   #status { margin-top: 10px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--gold); letter-spacing: 1px; min-height: 14px; }
 
   /* ---------- RIGHT: RESULT CARD ---------- */
-  #panel { position: fixed; top: 0; right: 0; z-index: 8; width: 500px; height: 100vh;
+  #panel { position: fixed; top: 0; right: 0; z-index: 8; width: var(--panel-w); height: 100vh;
     background: linear-gradient(270deg, rgba(253,251,245,.99), rgba(251,248,240,.97));
     border-left: 1px solid var(--line); backdrop-filter: blur(20px); box-shadow: -28px 0 70px rgba(90,70,20,.16);
     overflow-y: auto; padding: 34px 34px 40px; transform: translateX(102%);
@@ -226,6 +256,7 @@
     <button id="zout" title="Zoom out">−</button>
     <button id="zreset" title="Reset view">⟳</button>
   </div>
+  <div id="halo"></div>
   <div id="globe"></div>
   <div id="legend">
     <span><i class="lg-win"></i> Recommended</span>
@@ -321,7 +352,7 @@ const DC_HUBS = [
   ['Milan', 9.19, 45.46], ['Warsaw', 21.01, 52.23], ['Stockholm', 18.07, 59.33],
   ['Copenhagen', 12.57, 55.68], ['Vienna', 16.37, 48.21],
 ];
-const EUR_POV = { lat: 52, lng: 12, altitude: 1.6 };
+const EUR_POV = { lat: 53, lng: 14, altitude: 1.45 };
 
 function gmarker(d) {
   const el = document.createElement('div');
@@ -353,16 +384,31 @@ const globe = Globe()($('globe'))
   .labelResolution(2)
   .ringsData([]);
 
-function sizeGlobe() {
-  globe.width(window.innerWidth).height(window.innerHeight);
+const PANEL_W = 460;
+function stageWidth() {
+  // canvas fills the whole viewport until a result panel opens, then only the area left of it
+  return document.body.classList.contains('has-result') ? window.innerWidth - PANEL_W : window.innerWidth;
 }
-globe.onGlobeReady(() => { sizeGlobe(); $('globe').classList.add('on'); });
+function sizeGlobe() {
+  const w = stageWidth();
+  const el = $('globe');
+  el.style.width = w + 'px';
+  globe.width(w).height(window.innerHeight);
+}
+globe.onGlobeReady(() => { sizeGlobe(); $('globe').classList.add('on'); $('halo').classList.add('on'); });
 window.addEventListener('resize', sizeGlobe);
 globe.controls().autoRotate = false;
 globe.controls().autoRotateSpeed = 0.3;
 globe.controls().enableZoom = true;
 globe.controls().minDistance = 160;
 globe.controls().maxDistance = 380;
+// clamp rotation to Europe — feel the 3D parallax, but never spin off to the Pacific
+const C = globe.controls();
+C.enablePan = false;
+C.minPolarAngle = 0.55;   // can't tilt over the north pole
+C.maxPolarAngle = 1.45;   // can't tilt under to Antarctica
+C.minAzimuthAngle = -0.6; // limit left/right spin around Europe
+C.maxAzimuthAngle = 0.6;
 
 function addEntry(role, text) {
   const div = document.createElement('div');
@@ -391,7 +437,7 @@ let lastRanking = null;
 function decollide() {
   const gms = [...$('globe').querySelectorAll('.gm:not(.hub)')];
   if (!gms.length) { decollideRunning = false; return; }
-  const stageRight = $('stage').getBoundingClientRect().right;
+  const stageRight = $('globe').getBoundingClientRect().right;
   // seed each label at a rank-based vertical offset so clustered pins start already separated
   const seed = { 'i': -9, 'ii': -34, 'iii': 17 };
   const items = gms.map(el => {
@@ -585,6 +631,7 @@ function render(raw, memoText, source) {
     $('sources').innerHTML = `<b>DATA</b> ${raw.data_sources}<br><b>ASSUMPTIONS</b> PUE ${a.pue}, load factor ${a.load_factor} (${a.source || 'IEA'})`;
   }
 
+  sizeGlobe();
   drawMap(r, raw.heatmap);
   $('panel').scrollTop = 0;
 }
@@ -647,11 +694,11 @@ $('collapse').onclick = () => $('console').classList.toggle('folded');
 function zoom(f) { const v = globe.pointOfView(); globe.pointOfView({ ...v, altitude: Math.min(2.6, Math.max(0.35, v.altitude * f)) }, 500); }
 $('zin').onclick = () => zoom(0.7);
 $('zout').onclick = () => zoom(1.4);
-$('zreset').onclick = () => { globe.controls().autoRotate = true; globe.pointOfView(EUR_POV, 900); };
+$('zreset').onclick = () => globe.pointOfView(winFocus.altitude ? winFocus : EUR_POV, 900);
 $('panelclose').onclick = () => {
   $('panel').classList.remove('open');
   document.body.classList.remove('has-result');
-  globe.controls().autoRotate = true;
+  sizeGlobe();
   globe.pointOfView(EUR_POV, 1200);
 };
 </script>
