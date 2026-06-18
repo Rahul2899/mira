@@ -4,30 +4,25 @@
 
 ### ▶ [**Live demo — mira-f3ml.onrender.com**](https://mira-f3ml.onrender.com/)
 
-> The hosted app may take ~30 seconds to wake from idle on the first request.
+> Hosted on a free tier — the first request may take ~30s to wake from idle.
 
 ---
 
-Describe a data center in plain language (*"80 MW, lowest cost, but the grid must handle
-it"*) and mira returns a ranked, explained siting recommendation across 46 European regions,
-scored on cost, clean-energy share, grid headroom, and connectivity — with a power-supply
-plan and an optional satellite cross-check.
+Describe a data center in plain language — *"80 MW, lowest cost, but the grid must handle it"* — and mira returns a ranked, explained siting recommendation across 46 European regions, scored on cost, clean-energy share, grid headroom, and connectivity, with a power-supply plan for each pick.
 
-The language model — Anthropic Claude, served through **Amazon Bedrock** — is used only to
-interpret the request and narrate the answer. Every number is produced by a deterministic
-scoring engine (TOPSIS), so results are transparent, reproducible, and auditable.
+An AI agent only **reads your brief and narrates the answer**. Every number comes from a deterministic scoring engine (TOPSIS), so the results are transparent and reproducible.
+
+> Built as a weekend hackathon prototype, not a production system.
 
 ---
 
-## Features
+## What it does
 
-- **Region ranking** across 46 European regions on four weighted criteria.
-- **Natural-language input** — priorities are extracted from a free-text brief.
-- **Size as a constraint** — a region is excluded if its spare grid headroom cannot support
-  the facility's power draw.
-- **Power-supply planning** — grid / PPA / on-site guidance based on the local energy mix.
-- **Interactive 3D globe** — country-level suitability heat map and the top-3 candidates.
-- **Optional satellite verification** via Google DeepMind's AlphaEarth embeddings.
+- **Ranks 46 European regions** on four weighted criteria you control.
+- **Reads plain-English briefs** — priorities and facility size are extracted from free text.
+- **Treats size as a real constraint** — a region is ruled out if its spare grid headroom can't supply the facility's power draw.
+- **Plans the power supply** — grid / PPA / on-site guidance from the local energy mix.
+- **Interactive Europe map** with a suitability heat map and the top-3 candidates.
 
 ---
 
@@ -38,84 +33,16 @@ pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-Open <http://localhost:8000>. The processed dataset is included
-(`data/processed_region_data.csv`), so the application runs without any external services.
-The slider-driven `/optimize_site` path works fully offline.
-
----
-
-## Configuration
-
-mira runs with no configuration. Two optional capabilities can be enabled.
-
-### Conversational agent — AWS Bedrock (`/ask_agent`)
-
-The natural-language endpoint runs on **Amazon Bedrock**. `agent.py` creates a
-`bedrock-runtime` client (via `boto3`) and calls the **Converse API** with tool-use: the
-model (Anthropic Claude) extracts the four priority weights and an optional facility size
-from the brief, the deterministic engine runs, and the model narrates the result.
-
-| Setting | Value | Override |
-|---------|-------|----------|
-| Service | Amazon Bedrock Runtime (Converse API, tool-use) | — |
-| Model | `eu.anthropic.claude-sonnet-4-6` (an EU inference profile) | `BEDROCK_MODEL_ID` env var |
-| Region | `eu-central-1` | set in `agent.py` |
-
-**Requirements:**
-
-1. An AWS account with **Bedrock model access** granted for the Claude model in
-   `eu-central-1` (request it once in the Bedrock console → *Model access*).
-2. AWS credentials available through the standard boto3 chain — environment variables,
-   a shared profile, or an IAM role:
-
-   ```bash
-   export AWS_ACCESS_KEY_ID=...
-   export AWS_SECRET_ACCESS_KEY=...
-   # optional: export BEDROCK_MODEL_ID=eu.anthropic.claude-sonnet-4-6
-   ```
-
-> The region is pinned to `eu-central-1` because the `eu.` inference profile is only valid
-> there. Do not rely on `AWS_REGION` to change it.
-
-If Bedrock is unreachable, `agent.py` falls back to a keyword-based weight extractor
-(`run_local`). The deterministic ranking is identical either way; only the natural-language
-narration differs. The `/optimize_site` endpoint never uses Bedrock.
-
-### Satellite verification — Google Earth Engine
-
-```bash
-pip install earthengine-api
-earthengine authenticate
-export EE_PROJECT=your-earth-engine-project-id
-```
-
-Without it, the satellite badge is simply hidden and the ranking is unaffected.
-
----
-
-## Project structure
-
-```
-main.py              FastAPI app: /optimize_site (deterministic) and /ask_agent (LLM)
-topsis.py            TOPSIS ranking engine
-agent.py             AWS Bedrock agent — weight extraction and narration
-satellite.py         Optional AlphaEarth verification
-data_pipeline.py     Builds data/processed_region_data.csv from raw sources
-static/index.html    Single-file frontend (globe.gl, heat map, dossier)
-data/                Processed region dataset
-docs/ARCHITECTURE.md Detailed design notes
-```
+Open <http://localhost:8000>. The processed dataset is bundled, so the slider-driven ranking works fully offline with no external services. The natural-language endpoint additionally needs an AWS Bedrock connection (see below); without it, mira falls back to a keyword parser and the ranking is identical.
 
 ---
 
 ## API
 
-| Endpoint | Description |
-|----------|-------------|
-| `POST /optimize_site` | Deterministic ranking. Body: four weights in `[0,1]` and optional `size_mw`. |
-| `POST /ask_agent` | Natural-language path. Body: `{ "prompt": "..." }`. |
-
-Example:
+| Endpoint | Body | Notes |
+|----------|------|-------|
+| `POST /optimize_site` | four weights in `[0,1]`, optional `size_mw` | Deterministic, no AI. |
+| `POST /ask_agent` | `{ "prompt": "..." }` | Natural-language path. |
 
 ```bash
 curl -X POST http://localhost:8000/optimize_site \
@@ -125,36 +52,35 @@ curl -X POST http://localhost:8000/optimize_site \
 
 ---
 
-## Rebuilding the dataset
+## AI agent (optional)
 
-The processed dataset is committed, so this is only needed if the raw inputs change. Place
-the raw files under `raw_data/` and run:
-
-```
-raw_data/pypsa/buses.csv
-raw_data/ember_generation.csv
-raw_data/ember_prices.csv
-```
+`/ask_agent` calls **AWS Bedrock** (Anthropic Claude, `eu.anthropic.claude-sonnet-4-6`, region `eu-central-1`). It needs Bedrock model access and AWS credentials via the standard boto3 chain:
 
 ```bash
-python data_pipeline.py
+export AWS_ACCESS_KEY_ID=...
+export AWS_SECRET_ACCESS_KEY=...
+# optional: export BEDROCK_MODEL_ID=...
 ```
 
+Never commit credentials — pass them as environment variables or an IAM role. The region is pinned in `agent.py` (the `eu.` inference profile is only valid in `eu-central-1`).
+
 ---
+
+## Layout
+
+```
+main.py            FastAPI app: /optimize_site (deterministic) + /ask_agent (AI)
+topsis.py          TOPSIS ranking engine
+agent.py           Bedrock agent — weight extraction and narration
+satellite.py       Optional satellite cross-check
+static/index.html  Single-file frontend (Europe map + result dossier)
+data/              Processed region dataset (bundled)
+docs/              Architecture notes
+```
 
 ## Data sources
 
-- [Ember](https://ember-energy.org) — European electricity prices and generation mix.
-- [PyPSA-Eur](https://github.com/PyPSA/pypsa-eur) — European transmission grid model.
-- OpenStreetMap / ITU — internet-exchange and data-center hub locations.
-- [IEA Energy & AI](https://www.iea.org) — PUE and load-factor reference values.
-- [Google DeepMind AlphaEarth](https://deepmind.google) — satellite embeddings.
-
----
-
-## Tech stack
-
-Python · FastAPI · pandas / NumPy · AWS Bedrock · Google Earth Engine · globe.gl
+[Ember](https://ember-energy.org) (prices & generation mix) · [PyPSA-Eur](https://github.com/PyPSA/pypsa-eur) (grid model) · OpenStreetMap / ITU (network hubs) · [IEA Energy & AI](https://www.iea.org) (PUE & load factors).
 
 ## License
 

@@ -1,6 +1,8 @@
+import time
+from collections import deque
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -13,9 +15,24 @@ app = FastAPI(title="Autonomous Siting Engine Core")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["*"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+AGENT_RATE_LIMIT = 10
+AGENT_RATE_WINDOW = 60
+_agent_hits = {}
+
+
+def check_agent_rate(request):
+    ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    hits = _agent_hits.setdefault(ip, deque())
+    while hits and hits[0] <= now - AGENT_RATE_WINDOW:
+        hits.popleft()
+    if len(hits) >= AGENT_RATE_LIMIT:
+        raise HTTPException(status_code=429, detail="Too many requests, slow down a moment.")
+    hits.append(now)
 
 
 @app.middleware("http")
@@ -34,7 +51,7 @@ class SitingParameters(BaseModel):
 
 
 class AgentRequest(BaseModel):
-    prompt: str
+    prompt: str = Field(..., min_length=1, max_length=2000)
 
 
 @app.post("/optimize_site")
@@ -48,7 +65,8 @@ def optimize_site(payload: SitingParameters):
 
 
 @app.post("/ask_agent")
-def ask_agent(req: AgentRequest):
+def ask_agent(req: AgentRequest, request: Request):
+    check_agent_rate(request)
     try:
         return {**run_agent(req.prompt), "source": "live"}
     except Exception:
