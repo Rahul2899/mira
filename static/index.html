@@ -275,7 +275,12 @@
     #stage > * { max-width: 100%; }
     #brand { position: static; align-self: flex-start; padding: 22px 4px 4px; order: 1; }
     #brand h1 { font-size: 24px; }
-    #zoomctl { display: none; }            /* zoom is locked anyway; touch drag still works */
+    /* zoom controls: keep on mobile (pinch works too), but smaller, bottom-right, thumb-reachable.
+       drop the reset button to reduce clutter on a small screen. */
+    #zoomctl { position: fixed; top: auto; bottom: 18px; right: 14px; flex-direction: row; gap: 8px; z-index: 20; }
+    body.has-result #zoomctl { right: 14px; }
+    #zoomctl button { width: 44px; height: 44px; font-size: 20px; box-shadow: 0 4px 16px rgba(90,70,20,.2); }
+    #zreset { display: none !important; }
     #legend { display: none !important; }  /* the dossier names everything on mobile */
 
     /* hero above the globe */
@@ -509,11 +514,14 @@ globe.onGlobeReady(() => { sizeGlobe(); $('globe').classList.add('on'); $('halo'
 window.addEventListener('resize', sizeGlobe);
 globe.controls().autoRotate = false;
 globe.controls().autoRotateSpeed = 0.3;
-globe.controls().enableZoom = false;   // no scroll-zoom: prevents the camera diving into the
-                                       // surface and cropping the globe to a square. +/- buttons
-                                       // give controlled zoom within a safe range instead.
-// clamp rotation to Europe — feel the 3D parallax, but never spin off to the Pacific
+// Zoom is ON (mouse wheel + pinch), but CLAMPED to a distance range that always keeps the
+// whole sphere round. The old square bug came from zooming closer than the canvas can hold;
+// minDistance prevents that. (globe.gl: distance = 100 * (1 + altitude).)
 const C = globe.controls();
+C.enableZoom = true;
+C.zoomSpeed = 0.6;
+C.minDistance = 260;   // ~altitude 1.6 — closest before the sphere would overflow to a square
+C.maxDistance = 460;   // ~altitude 3.6 — farthest out
 C.enablePan = false;
 C.minPolarAngle = 0.55;   // can't tilt over the north pole
 C.maxPolarAngle = 1.45;   // can't tilt under to Antarctica
@@ -803,7 +811,7 @@ $('clearchat').onclick = () => { $('log').innerHTML = ''; $('status').textConten
 $('collapse').onclick = () => { $('console').classList.toggle('folded'); sizeGlobe(); };
 
 // keep the +/- buttons within a range where the whole sphere stays visible and round
-function zoom(f) { const v = globe.pointOfView(); globe.pointOfView({ ...v, altitude: Math.min(3.2, Math.max(1.6, v.altitude * f)) }, 500); }
+function zoom(f) { const v = globe.pointOfView(); globe.pointOfView({ ...v, altitude: Math.min(3.6, Math.max(1.6, v.altitude * f)) }, 500); }
 $('zin').onclick = () => zoom(0.7);
 $('zout').onclick = () => zoom(1.4);
 $('zreset').onclick = () => globe.pointOfView(winFocus.altitude ? winFocus : EUR_POV, 900);
