@@ -51,6 +51,8 @@
   @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
   /* centered elements animate opacity only so their translateX(-50%) is preserved */
   @keyframes fadeUp { from { opacity: 0; } }
+  /* mobile-only clarity hints (hidden on desktop where controls/affordances are obvious) */
+  #ctahint, #globehint { display: none; }
 
   /* globe canvas is a contained box centered in the stage, never the full viewport,
      so the hero sits clear above it and the console docks clear below it. JS sets size. */
@@ -296,6 +298,13 @@
     /* tuned halo behind the inline globe — absolute so it scrolls with the page (JS positions it) */
     #halo { position: absolute; transform: translate(-50%, -50%); }
 
+    /* clarity hints: tell a first-time mobile visitor what to do */
+    #ctahint { display: block; font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 1px; color: var(--muted); margin-bottom: 9px; }
+    #globehint { display: block; order: 3; text-align: center; font-family: 'JetBrains Mono', monospace;
+      font-size: 9.5px; letter-spacing: 1.5px; color: var(--muted); margin: 2px auto 0; }
+    body.has-result #globehint { display: none; }   /* once exploring, the hint is redundant */
+
     /* console: full-width card in the flow */
     #console { position: static !important; transform: none !important; left: auto !important;
       bottom: auto; width: 100%; max-width: 100%; margin: 22px 0 0; border-radius: 18px; order: 4;
@@ -338,6 +347,7 @@
   </div>
   <div id="halo"></div>
   <div id="globe"></div>
+  <div id="globehint">Pinch to zoom · tap a pin</div>
   <div id="legend">
     <div class="lgtitle">WHAT THE MAP SHOWS</div>
     <div class="row"><span class="sym"><i class="lg-win"></i></span>
@@ -363,6 +373,7 @@
       <div id="conbtns"><button id="clearchat">CLEAR</button><button id="collapse">▾</button></div>
     </div>
     <div id="conbody">
+      <div id="ctahint">Tap an example or type your own</div>
       <div id="chips">
         <button class="chip">Greenest & cheapest, 100MW</button>
         <button class="chip">2GW campus, biggest grid</button>
