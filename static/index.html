@@ -18,6 +18,10 @@
     --stage-center: 42%;          /* visual center of the globe stage (left of panel) */
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  /* themed focus ring — replaces the browser's default blue outline with a soft gold one */
+  button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--gold); outline-offset: 2px; }
+  button:focus:not(:focus-visible) { outline: none; }
   html, body { height: 100%; overflow: hidden; }
   body { background: var(--bg); color: var(--ink); font-family: 'Manrope', sans-serif; }
 
@@ -31,15 +35,15 @@
   body.has-result #stage { --stage-center: calc((100% - var(--panel-w)) / 2); }
 
   /* soft premium halo behind the globe — warm gold core fading to a cool atmosphere ring */
-  #halo { position: fixed; z-index: 0; left: var(--stage-center); top: 46%;
-    width: 76vh; height: 76vh; transform: translate(-50%, -50%); pointer-events: none;
-    border-radius: 50%; opacity: 0; transition: opacity 1.6s ease, left .9s cubic-bezier(.22,1,.3,1);
+  #halo { position: fixed; z-index: 0; left: var(--stage-center); top: 50%;
+    transform: translate(-50%, -50%); pointer-events: none;
+    border-radius: 50%; opacity: 0;
+    transition: opacity 1.6s ease, left .9s cubic-bezier(.22,1,.3,1), top .9s cubic-bezier(.22,1,.3,1);
     background:
-      radial-gradient(circle, rgba(201,168,76,.20) 0%, rgba(201,168,76,.07) 38%, transparent 60%),
-      radial-gradient(circle, transparent 58%, rgba(120,150,200,.10) 64%, transparent 72%);
-    filter: blur(2px); }
+      radial-gradient(circle, rgba(201,168,76,.22) 0%, rgba(201,168,76,.08) 36%, transparent 58%),
+      radial-gradient(circle, transparent 56%, rgba(120,150,200,.12) 63%, transparent 71%);
+    filter: blur(3px); }
   #halo.on { opacity: 1; }
-  body.has-result #halo { left: calc((100% - var(--panel-w)) / 2); }
   #brand { position: absolute; top: 30px; left: 38px; z-index: 5;
     animation: rise .9s cubic-bezier(.22,1,.3,1) both; }
   #brand h1 { font-family: 'Fraunces', serif; font-style: italic; font-weight: 400; font-size: 30px; color: var(--ink); }
@@ -48,8 +52,11 @@
   /* centered elements animate opacity only so their translateX(-50%) is preserved */
   @keyframes fadeUp { from { opacity: 0; } }
 
-  #globe { position: absolute; left: 0; top: 0; opacity: 0; z-index: 1;
-    transition: opacity 1.6s ease, width .9s cubic-bezier(.22,1,.3,1); }
+  /* globe canvas is a contained box centered in the stage, never the full viewport,
+     so the hero sits clear above it and the console docks clear below it. JS sets size. */
+  #globe { position: fixed; top: 50%; left: var(--stage-center); transform: translate(-50%, -50%);
+    opacity: 0; z-index: 1;
+    transition: opacity 1.6s ease, left .9s cubic-bezier(.22,1,.3,1); }
   #globe.on { opacity: 1; }
 
   #zoomctl { position: fixed; top: 30px; right: 34px; z-index: 9; display: flex; flex-direction: column; gap: 8px;
@@ -60,18 +67,28 @@
     box-shadow: 0 4px 14px rgba(90,70,20,.1); display: flex; align-items: center; justify-content: center; transition: all .2s; }
   #zoomctl button:hover { background: #fff; color: var(--ink); transform: scale(1.06); }
 
-  #legend { position: fixed; left: 30px; bottom: 30px; z-index: 5; display: flex; flex-direction: column; gap: 7px;
-    font-size: 10.5px; color: #5d5743; background: rgba(255,253,246,.78); border: 1px solid var(--line); border-radius: 12px;
-    padding: 12px 15px; backdrop-filter: blur(10px); box-shadow: 0 8px 28px rgba(90,70,20,.1);
+  /* MAP KEY — plain-English, each symbol gets a label + a one-line "why" */
+  #legend { position: fixed; left: 30px; bottom: 30px; z-index: 5; width: 226px;
+    color: #5d5743; background: rgba(255,253,246,.9); border: 1px solid var(--line); border-radius: 14px;
+    padding: 15px 16px 16px; backdrop-filter: blur(12px); box-shadow: 0 12px 36px rgba(90,70,20,.13);
     opacity: 0; transition: opacity .5s; }
   #legend.on { opacity: 1; }
-  #legend span { display: flex; align-items: center; gap: 8px; }
-  #legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-  .lg-win { background: var(--gold-bright); box-shadow: 0 0 7px 1px rgba(201,168,76,.8); }
+  #legend .lgtitle { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 2.5px;
+    color: var(--muted); margin-bottom: 11px; }
+  #legend .row { display: grid; grid-template-columns: 18px 1fr; gap: 9px; align-items: start; margin-bottom: 10px; }
+  #legend .row:last-of-type { margin-bottom: 0; }
+  #legend .sym { width: 14px; height: 14px; margin-top: 2px; justify-self: center; }
+  #legend .lab { font-size: 11.5px; font-weight: 700; color: var(--ink); line-height: 1.25; }
+  #legend .why { font-size: 10px; color: var(--muted); line-height: 1.3; margin-top: 1px; }
+  #legend i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  .lg-win { background: var(--gold-bright); box-shadow: 0 0 0 3px rgba(201,168,76,.25), 0 0 8px 1px rgba(201,168,76,.7); }
   .lg-site { background: var(--gold); }
-  .lg-hub { background: #5b8fd6; box-shadow: 0 0 6px 1px rgba(91,143,214,.7); }
-  .heatbar { display: inline-block; width: 130px; height: 8px; border-radius: 4px;
+  .lg-hub { background: #5b8fd6; box-shadow: 0 0 6px 1px rgba(91,143,214,.6); }
+  #legend .heatrow { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .heatbar { display: block; width: 100%; height: 9px; border-radius: 5px; margin: 6px 0 3px;
     background: linear-gradient(90deg, rgb(220,60,60), rgb(220,210,60), rgb(60,210,60)); }
+  #legend .scale { display: flex; justify-content: space-between; font-size: 9px;
+    letter-spacing: .5px; color: var(--muted); }
   .fxgrid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px 10px; }
   .fxgrid > div { display: flex; flex-direction: column; }
   .fxn { font-family: 'Fraunces', serif; font-size: 19px; color: var(--gold); }
@@ -101,12 +118,12 @@
     letter-spacing: 1px; color: #46618a; background: rgba(255,253,246,.8); padding: 2px 7px; border-radius: 999px; }
   @keyframes gpulse { 50% { box-shadow: 0 0 0 7px rgba(201,168,76,.1), 0 0 20px 6px rgba(201,168,76,.4); } }
 
-  #emptymap { position: fixed; left: var(--stage-center); top: 96px; transform: translateX(-50%);
-    max-width: 440px; width: 80vw; text-align: center; display: flex;
-    flex-direction: column; gap: 12px; color: var(--muted); pointer-events: none; z-index: 4;
+  #emptymap { position: fixed; left: var(--stage-center); top: 64px; transform: translateX(-50%);
+    max-width: 460px; width: 84vw; text-align: center; display: flex;
+    flex-direction: column; gap: 8px; color: var(--muted); pointer-events: none; z-index: 4;
     animation: fadeUp 1s ease .25s both; transition: opacity .5s; }
-  #emptymap .big { font-family: 'Fraunces', serif; font-style: italic; font-size: 34px; color: var(--ink); line-height: 1.12; }
-  #emptymap .sub { font-size: 13.5px; line-height: 1.6; max-width: 380px; margin: 0 auto; }
+  #emptymap .big { font-family: 'Fraunces', serif; font-style: italic; font-size: 32px; color: var(--ink); line-height: 1.12; }
+  #emptymap .sub { font-size: 13px; line-height: 1.55; max-width: 400px; margin: 0 auto; }
 
   /* ---------- CONSOLE (docked bar, centered under the globe stage) ---------- */
   #console { position: fixed; left: var(--stage-center); bottom: 30px; z-index: 6; width: min(520px, 46vw);
@@ -116,6 +133,9 @@
     animation: fadeUp 1s ease .4s both;
     transition: left .9s cubic-bezier(.22,1,.3,1), width .9s cubic-bezier(.22,1,.3,1); }
   body.has-result #console { width: min(460px, calc((100% - var(--panel-w)) - 76px)); }
+  /* on a result, collapse the console to a slim input bar so it never crowds the globe */
+  body.has-result #chips, body.has-result #log, body.has-result #status { display: none; }
+  body.has-result #conbody { padding-top: 13px; }
   #conhead { display: flex; align-items: center; justify-content: space-between; padding: 11px 15px;
     border-bottom: 1px solid rgba(168,132,44,.12); }
   #contitle { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 3px; color: var(--muted); }
@@ -196,7 +216,7 @@
   .cmp { display: grid; grid-template-columns: 108px 1fr 1fr 1fr; gap: 9px 10px; align-items: center; font-size: 11px; }
   .cmp .axis { color: #5d5743; font-weight: 600; font-size: 10.5px; display: flex; flex-direction: column; }
   .cmp .axis .aval { color: var(--gold); font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 400; margin-top: 1px; }
-  .cmp .reg { font-weight: 600; font-size: 10px; text-align: center; color: #5d5743; padding-bottom: 3px; }
+  .cmp .reg { font-weight: 600; font-size: 9.5px; line-height: 1.15; text-align: center; color: #5d5743; padding-bottom: 4px; word-break: break-word; }
   .cmp .reg.win { color: var(--gold); }
   .cbar { height: 7px; background: rgba(168,132,44,.12); border-radius: 4px; overflow: hidden; }
   .cbar > span { display: block; height: 100%; background: var(--gold-bright); border-radius: 4px; }
@@ -259,16 +279,23 @@
   <div id="halo"></div>
   <div id="globe"></div>
   <div id="legend">
-    <span><i class="lg-win"></i> Recommended</span>
-    <span><i class="lg-site"></i> Shortlist</span>
-    <span><i class="lg-hub"></i> Internet exchange / fibre hub</span>
-    <span style="margin-top:4px"><b style="color:#5d5743">Suitable data center location:</b></span>
-    <span><span class="heatbar"></span></span>
-    <span style="font-size:9px;letter-spacing:.5px;color:var(--muted)">poor&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;good</span>
+    <div class="lgtitle">WHAT THE MAP SHOWS</div>
+    <div class="row"><span class="sym"><i class="lg-win"></i></span>
+      <div><div class="lab">Top pick</div><div class="why">Our #1 recommended site</div></div></div>
+    <div class="row"><span class="sym"><i class="lg-site"></i></span>
+      <div><div class="lab">Runner-ups</div><div class="why">2nd & 3rd best options</div></div></div>
+    <div class="row"><span class="sym"><i class="lg-hub"></i></span>
+      <div><div class="lab">Internet hubs</div><div class="why">Major exchanges; closer means lower latency</div></div></div>
+    <div class="heatrow">
+      <div class="lab" style="font-size:11px">Country shading</div>
+      <div class="why">Overall suitability for a data center</div>
+      <span class="heatbar"></span>
+      <div class="scale"><span>poor</span><span>good</span></div>
+    </div>
   </div>
   <div id="emptymap">
     <div class="big">Where should it be built?</div>
-    <div class="sub">Describe your data center below — size, budget, and what matters most. The agent will rank Europe's regions and explain the trade-off.</div>
+    <div class="sub">Describe your facility: size, budget, and priorities. The agent ranks Europe's regions and explains the trade off.</div>
   </div>
 
   <div id="console">
@@ -283,7 +310,7 @@
       </div>
       <div id="log"></div>
       <div id="inputrow">
-        <input id="prompt" placeholder="Describe your data center — size, budget, priorities..." />
+        <input id="prompt" placeholder="Describe your data center: size, budget, priorities..." />
         <button id="send">ASK</button>
       </div>
       <div id="status"></div>
@@ -298,7 +325,7 @@
     <div id="pickmeta"></div>
     <div id="scorebar"><div id="scorenum"></div><div id="why"></div></div>
 
-    <div class="block"><h3>WHY THIS ONE — TOP 3 COMPARED</h3><div class="cmp" id="cmp"></div></div>
+    <div class="block"><h3>WHY THIS ONE · TOP 3 COMPARED</h3><div class="cmp" id="cmp"></div></div>
 
     <div class="block" id="satblock" style="display:none"><h3>SATELLITE-VERIFIED</h3>
       <div id="satline"></div>
@@ -320,7 +347,7 @@
       <button id="refine">UPDATE RANKING</button>
     </div>
 
-    <details class="block" id="memoblock"><summary>AGENT MEMO — full reasoning</summary><div id="memonote"></div><div id="memo"></div></details>
+    <details class="block" id="memoblock"><summary>AGENT MEMO · full reasoning</summary><div id="memonote"></div><div id="memo"></div></details>
     <div id="sources"></div>
   </div>
 </div>
@@ -339,7 +366,7 @@ const AXES = [
 ];
 const STEPS = ['READING YOUR BRIEF','RANKING EUROPE','WRITING THE MEMO'];
 const CHIP_BRIEFS = {
-  'Greenest & cheapest, 100MW': 'A 100MW data center — I want the cleanest grid AND the lowest electricity cost, both matter most. Carbon-free is important.',
+  'Greenest & cheapest, 100MW': 'A 100MW data center. I want the cleanest grid AND the lowest electricity cost, both matter most. Carbon-free is important.',
   '2GW campus, biggest grid': 'I am building a massive 2000MW AI training campus. I need the single largest grid capacity that can physically handle it.',
   'Next to internet exchange, 80MW': 'An 80MW low-latency inference site. The only thing that matters is being right next to the biggest European internet exchange.',
 };
@@ -352,14 +379,14 @@ const DC_HUBS = [
   ['Milan', 9.19, 45.46], ['Warsaw', 21.01, 52.23], ['Stockholm', 18.07, 59.33],
   ['Copenhagen', 12.57, 55.68], ['Vienna', 16.37, 48.21],
 ];
-const EUR_POV = { lat: 53, lng: 14, altitude: 1.45 };
+const EUR_POV = { lat: 50, lng: 15, altitude: 2.4 };
 
 function gmarker(d) {
   const el = document.createElement('div');
   el.className = `gm ${d.kind}`;
   if (d.kind === 'hub') {
     el.innerHTML = `<span class="hubdot"></span><span class="hublab">${d.text} IX</span>`;
-    el.title = d.text + ' — nearest internet exchange';
+    el.title = d.text + ': nearest internet exchange';
   } else {
     el.innerHTML = `<span class="dot"></span><span class="lab"><span class="rk">${d.rk}</span>${d.text}</span>`;
     el.dataset.region = d.text;
@@ -385,23 +412,37 @@ const globe = Globe()($('globe'))
   .ringsData([]);
 
 const PANEL_W = 460;
-function stageWidth() {
-  // canvas fills the whole viewport until a result panel opens, then only the area left of it
-  return document.body.classList.contains('has-result') ? window.innerWidth - PANEL_W : window.innerWidth;
-}
 function sizeGlobe() {
-  const w = stageWidth();
+  const hasResult = document.body.classList.contains('has-result');
+  // stage = area left of the dossier (or full width before a result)
+  const stageW = hasResult ? window.innerWidth - PANEL_W : window.innerWidth;
+  // reserve clear bands: hero on top, console at the bottom, so the globe never overlaps them
+  const topBand = hasResult ? 40 : 138;
+  const botBand = hasResult ? 40 : 250;
+  const boxH = Math.max(360, window.innerHeight - topBand - botBand);
+  const boxW = Math.min(stageW - 48, hasResult ? stageW : boxH * 1.1);
+  const size = Math.min(boxW, boxH);
   const el = $('globe');
-  el.style.width = w + 'px';
-  globe.width(w).height(window.innerHeight);
+  el.style.width = size + 'px';
+  el.style.height = size + 'px';
+  // vertical center sits inside the band between hero and console
+  const centerY = topBand + boxH / 2;
+  el.style.top = centerY + 'px';
+  globe.width(size).height(size);
+  // the sphere at altitude 2.4 fills ~58% of the square canvas; size the halo to that
+  // visible sphere (a touch larger) so the glow hugs the globe edge, not the canvas edge.
+  const sphere = size * 0.58;
+  const halo = $('halo');
+  halo.style.width = halo.style.height = (sphere * 1.18) + 'px';
+  halo.style.top = centerY + 'px';
 }
 globe.onGlobeReady(() => { sizeGlobe(); $('globe').classList.add('on'); $('halo').classList.add('on'); });
 window.addEventListener('resize', sizeGlobe);
 globe.controls().autoRotate = false;
 globe.controls().autoRotateSpeed = 0.3;
-globe.controls().enableZoom = true;
-globe.controls().minDistance = 160;
-globe.controls().maxDistance = 380;
+globe.controls().enableZoom = false;   // no scroll-zoom: prevents the camera diving into the
+                                       // surface and cropping the globe to a square. +/- buttons
+                                       // give controlled zoom within a safe range instead.
 // clamp rotation to Europe — feel the 3D parallax, but never spin off to the Pacific
 const C = globe.controls();
 C.enablePan = false;
@@ -491,9 +532,11 @@ function drawMap(sites, heatmap) {
   $('emptymap').style.display = 'none';
   $('legend').classList.add('on');
   const win = sites[0];
-  winFocus = { lat: win.lat - 1, lng: win.lon, altitude: 1.1 };
+  // keep the globe contained and round; just recenter on Europe (and slightly toward the
+  // winner) at the same pulled-back altitude. Never deep-zoom to full-bleed.
+  winFocus = { lat: 50, lng: 13, altitude: 2.4 };
   globe.controls().autoRotate = false;
-  globe.pointOfView(winFocus, 1600);
+  globe.pointOfView(winFocus, 1400);
 
   // country-level heat map: color each country's MAIN landmass red(poor) -> green(good)
   if (heatmap && heatmap.length && europeGeo) {
@@ -509,10 +552,9 @@ function drawMap(sites, heatmap) {
       .polygonSideColor(() => 'rgba(0,0,0,0)')
       .polygonStrokeColor(() => 'rgba(255,255,255,0.3)')
       .polygonAltitude(0.004);
-    // country name labels at each ranked country's centroid
-    globe.labelsData(ranked.map(f => ({
-      lat: f.properties.LAT, lng: f.properties.LON, text: f.properties.NAME,
-    })));
+    // no country-name labels — at this zoom they collide into clutter; the colored heat map
+    // plus the ranked i/ii/iii pins carry the meaning, and the dossier names every region.
+    globe.labelsData([]);
   }
 
   const markers = sites.map((s, i) => ({
@@ -576,7 +618,7 @@ function render(raw, memoText, source) {
   if (source) { $('badge').textContent = source === 'live' ? 'LIVE AGENT' : 'OFFLINE'; $('badge').className = source; }
 
   // compare grid — winner's real value shown beside each axis
-  let cmp = `<div class="axis"></div>` + r.map((s, i) => `<div class="reg ${i === 0 ? 'win' : ''}">${s.region.split(' — ')[0].slice(0, 12)}</div>`).join('');
+  let cmp = `<div class="axis"></div>` + r.map((s, i) => `<div class="reg ${i === 0 ? 'win' : ''}">${s.region.split(' — ')[0]}</div>`).join('');
   AXES.forEach(([key, label, fmt]) => {
     cmp += `<div class="axis">${label}<span class="aval">${fmt(top.raw, top)}</span></div>` + r.map((s, i) => `<div class="col${i}">${bar(s.profile[key])}</div>`).join('');
   });
@@ -624,7 +666,7 @@ function render(raw, memoText, source) {
       .filter(l => l && !/^Here is|^Based on/i.test(l));
     $('memo').innerHTML = '<ul>' + items.map(l => `<li>${l}</li>`).join('') + '</ul>';
     $('memonote').innerHTML = '';
-  } else $('memonote').innerHTML = '<div class="note">Priorities adjusted by hand — ranking updated; memo describes the original run.</div>';
+  } else $('memonote').innerHTML = '<div class="note">Priorities adjusted by hand. Ranking updated; memo describes the original run.</div>';
 
   if (raw.data_sources) {
     const a = raw.assumptions || {};
@@ -655,12 +697,12 @@ async function handleSend(text) {
     const resp = await fetch('/ask_agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: text }) });
     const data = await resp.json();
     if (!data.raw_result || !data.raw_result.ranking || !data.raw_result.ranking.length) {
-      addEntry('agent', data.memo || 'Tell me a bit more — a size, budget, or what matters most (cost, clean energy, grid, connectivity).');
+      addEntry('agent', data.memo || 'Tell me a bit more: a size, budget, or what matters most (cost, clean energy, grid, connectivity).');
     } else {
       addEntry('agent', `Recommended: ${data.raw_result.ranking[0].region.split(' — ')[0]}`);
       render(data.raw_result, data.memo, data.source);
     }
-  } catch (e) { addEntry('agent', 'Could not reach the engine — is the backend running?'); }
+  } catch (e) { addEntry('agent', 'Could not reach the engine. Is the backend running?'); }
   finally { clearInterval(timer); $('status').textContent = ''; setBusy(false); }
 }
 
@@ -678,7 +720,7 @@ async function refine() {
     if (!resp.ok) { $('powerplan').textContent = (await resp.json()).detail; $('powerblock').style.display = ''; return; }
     render(await resp.json(), null);
   } catch (e) {
-    $('powerplan').textContent = 'Could not reach the engine — is the backend running?';
+    $('powerplan').textContent = 'Could not reach the engine. Is the backend running?';
     $('powerblock').style.display = '';
   } finally { busy = false; $('refine').disabled = false; }
 }
@@ -689,9 +731,10 @@ $('refine').onclick = refine;
 $('send').onclick = () => handleSend();
 $('prompt').onkeydown = e => { if (e.key === 'Enter') handleSend(); };
 $('clearchat').onclick = () => { $('log').innerHTML = ''; $('status').textContent = ''; };
-$('collapse').onclick = () => $('console').classList.toggle('folded');
+$('collapse').onclick = () => { $('console').classList.toggle('folded'); sizeGlobe(); };
 
-function zoom(f) { const v = globe.pointOfView(); globe.pointOfView({ ...v, altitude: Math.min(2.6, Math.max(0.35, v.altitude * f)) }, 500); }
+// keep the +/- buttons within a range where the whole sphere stays visible and round
+function zoom(f) { const v = globe.pointOfView(); globe.pointOfView({ ...v, altitude: Math.min(3.2, Math.max(1.6, v.altitude * f)) }, 500); }
 $('zin').onclick = () => zoom(0.7);
 $('zout').onclick = () => zoom(1.4);
 $('zreset').onclick = () => globe.pointOfView(winFocus.altitude ? winFocus : EUR_POV, 900);
