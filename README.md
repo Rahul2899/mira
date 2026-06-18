@@ -22,7 +22,7 @@ An AI agent only **reads your brief and narrates the answer**. Every number come
 - **Reads plain-English briefs** — priorities and facility size are extracted from free text.
 - **Treats size as a real constraint** — a region is ruled out if its spare grid headroom can't supply the facility's power draw.
 - **Plans the power supply** — grid / PPA / on-site guidance from the local energy mix.
-- **Interactive Europe map** with a suitability heat map and the top-3 candidates.
+- **Interactive 3D globe**, framed on Europe, with a country-level suitability heat map and the top-3 candidates.
 
 ---
 
@@ -73,7 +73,7 @@ main.py            FastAPI app: /optimize_site (deterministic) + /ask_agent (AI)
 topsis.py          TOPSIS ranking engine
 agent.py           Bedrock agent — weight extraction and narration
 satellite.py       Optional satellite cross-check
-static/index.html  Single-file frontend (Europe map + result dossier)
+static/index.html  Single-file frontend (3D globe + result dossier)
 data/              Processed region dataset (bundled)
 docs/              Architecture notes
 ```

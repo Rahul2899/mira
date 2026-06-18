@@ -321,7 +321,7 @@ const DC_HUBS = [
   ['Milan', 9.19, 45.46], ['Warsaw', 21.01, 52.23], ['Stockholm', 18.07, 59.33],
   ['Copenhagen', 12.57, 55.68], ['Vienna', 16.37, 48.21],
 ];
-const EUR_POV = { lat: 50, lng: 10, altitude: 2.2 };
+const EUR_POV = { lat: 52, lng: 12, altitude: 1.6 };
 
 function gmarker(d) {
   const el = document.createElement('div');
@@ -358,7 +358,7 @@ function sizeGlobe() {
 }
 globe.onGlobeReady(() => { sizeGlobe(); $('globe').classList.add('on'); });
 window.addEventListener('resize', sizeGlobe);
-globe.controls().autoRotate = true;
+globe.controls().autoRotate = false;
 globe.controls().autoRotateSpeed = 0.3;
 globe.controls().enableZoom = true;
 globe.controls().minDistance = 160;
@@ -407,13 +407,12 @@ function decollide() {
   // include the Frankfurt hub label so winner/runner pills never collide with it
   const hub = $('globe').querySelector('.gm.hub .lab');
   if (hub) items.push({ el: hub.parentElement, lab: hub });
-  // resolve overlaps by nudging vertically; if two still collide, hide the lower-ranked label
-  // (its name is in the card) — guarantees the globe is never cluttered.
+  // resolve overlaps by nudging labels vertically; never hide a label — all three
+  // picks must always be readable on the map even if two end up close together.
   items.forEach(it => it.lab.style.visibility = 'visible');
-  for (let pass = 0; pass < 4; pass++) {
+  for (let pass = 0; pass < 6; pass++) {
     for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) {
       const A = items[i], B = items[j];
-      if (A.lab.style.visibility === 'hidden' || B.lab.style.visibility === 'hidden') continue;
       const a = A.lab.getBoundingClientRect(), b = B.lab.getBoundingClientRect();
       if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) {
         const push = (Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)) / 2 + 2;
@@ -421,17 +420,6 @@ function decollide() {
         lower.lab.style.top = (parseFloat(lower.lab.style.top || -9) + push) + 'px';
         upper.lab.style.top = (parseFloat(upper.lab.style.top || -9) - push) + 'px';
       }
-    }
-  }
-  // final check: any still-overlapping pair -> hide the one whose rank is higher (less important)
-  for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) {
-    const A = items[i], B = items[j];
-    if (A.lab.style.visibility === 'hidden' || B.lab.style.visibility === 'hidden') continue;
-    const a = A.lab.getBoundingClientRect(), b = B.lab.getBoundingClientRect();
-    if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) {
-      const rankA = A.el.querySelector('.rk')?.textContent || '';
-      const rankB = B.el.querySelector('.rk')?.textContent || '';
-      (rankA.length >= rankB.length ? A : B).lab.style.visibility = 'hidden';
     }
   }
   requestAnimationFrame(decollide);
@@ -630,15 +618,22 @@ async function handleSend(text) {
 }
 
 async function refine() {
+  if (busy) return;
   const size = parseFloat($('size_mw').value);
   const body = {
     weight_cost: $('w_cost').value / 100, weight_green: $('w_green').value / 100,
     weight_grid: $('w_grid').value / 100, weight_connectivity: $('w_conn').value / 100,
     size_mw: size > 0 ? size : null,
   };
-  const resp = await fetch('/optimize_site', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  if (!resp.ok) { $('powerplan').textContent = (await resp.json()).detail; $('powerblock').style.display = ''; return; }
-  render(await resp.json(), null);
+  busy = true; $('refine').disabled = true;
+  try {
+    const resp = await fetch('/optimize_site', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!resp.ok) { $('powerplan').textContent = (await resp.json()).detail; $('powerblock').style.display = ''; return; }
+    render(await resp.json(), null);
+  } catch (e) {
+    $('powerplan').textContent = 'Could not reach the engine — is the backend running?';
+    $('powerblock').style.display = '';
+  } finally { busy = false; $('refine').disabled = false; }
 }
 
 document.querySelectorAll('.sliderrow input').forEach(s => s.oninput = () => s.nextElementSibling.textContent = s.value + '%');
