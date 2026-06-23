@@ -84,4 +84,4 @@ docs/              Architecture notes
 
 ## License
 
-MIT
+MIT License
